@@ -628,8 +628,8 @@
   <!-- ===================== DEVOTIONAL ===================== -->
   <section class="panel" id="panel-devotional">
     <div class="section-head">
-      <h2>This week's devotional</h2>
-      <div class="sub">A short word before the whistle blows — posted by your intramural coordinators each week.</div>
+      <h2>Today's reading</h2>
+      <div class="sub">A short daily reading from Life.Church's Bible App — a new day every morning of the season.</div>
     </div>
     <div class="card" id="devotional-card" style="padding:28px 30px; border-left:4px solid var(--gold);"></div>
   </section>
@@ -682,7 +682,7 @@
   <section class="panel" id="panel-admin">
     <div class="section-head">
       <h2>Coordinator admin</h2>
-      <div class="sub">Set the active sport, post the weekly devotional, and assign game times — changes appear live for everyone viewing the app.</div>
+      <div class="sub">Set the active sport, the season dates, and game times — changes appear live for everyone viewing the app.</div>
     </div>
 
     <div class="card access-note">
@@ -716,23 +716,6 @@
         <button type="submit" class="submit" id="admin-season-save">Save season dates</button>
         <div class="status-msg" id="admin-season-status" role="status"></div>
         <p class="form-note">Must span at least 4 whole weeks (sign-ups, one regular week, playoffs, championship). Rounds to the nearest whole week if the gap isn't exact.</p>
-      </form>
-    </div>
-
-    <div class="card" style="padding:20px 22px; margin-top:16px;">
-      <h3 style="margin-bottom:6px;">Weekly devotional</h3>
-      <p class="sub" style="margin-bottom:14px;">Replaces the content on the Devotional tab.</p>
-      <form class="signup" id="admin-devotional-form">
-        <div class="field-row">
-          <div class="field"><label for="admin-dev-title">Title</label><input id="admin-dev-title" type="text" maxlength="60" required></div>
-          <div class="field"><label for="admin-dev-verse">Scripture reference</label><input id="admin-dev-verse" type="text" maxlength="60" required placeholder="e.g. 1 Corinthians 9:24–25"></div>
-        </div>
-        <div class="field">
-          <label for="admin-dev-body">Reflection</label>
-          <textarea id="admin-dev-body" class="field-textarea" rows="6" maxlength="1200" required></textarea>
-        </div>
-        <button type="submit" class="submit" id="admin-devotional-save">Post devotional</button>
-        <div class="status-msg" id="admin-devotional-status" role="status"></div>
       </form>
     </div>
 
@@ -824,11 +807,30 @@
     return w ? formatWeekRange(w.start) : '';
   }
 
-  var DEFAULT_DEVOTIONAL = {
-    title: 'Run to Win',
-    verse: '1 Corinthians 9:24–25',
-    body: "Paul told the Corinthians that every runner in a race trains with purpose — “they do it to get a crown that will not last, but we do it to get a crown that will last forever.” Every intramural season starts with the same choice every athlete makes on the field: play for what fades, or play like it's for something bigger. Whatever you compete in this season, compete with everything you've got, keep your temper on the sideline, and remember your teammates — and your opponents — are watching how you carry both winning and losing."
+  // Devotional: a fixed 6-day Life.Church Bible App plan, cycling one day per
+  // real calendar day from the season's start date. No admin editing or
+  // database involved — it's the same for everyone, always in sync.
+  var DEVOTIONAL_PLAN = {
+    title: "Knowing Yourself (Part 1): You Are God's Image",
+    source: 'Life.Church · Bible App',
+    baseUrl: 'https://www.bible.com/reading-plans/72622-knowing-yourself-part-1-you-are-gods-image',
+    days: [
+      { day:1, title: "Made in God's Image", verse: 'Genesis 1:26' },
+      { day:2, title: 'Created After His Likeness', verse: 'Genesis 1:26; Romans 8:29' },
+      { day:3, title: 'The Dominion Dimension', verse: 'Psalm 8:4–6' },
+      { day:4, title: "Walking in Christ's Example", verse: 'Hebrews 1:3' },
+      { day:5, title: 'Free Will and Responsibility', verse: 'Genesis 2:16–17' },
+      { day:6, title: 'Becoming Fully You', verse: 'Romans 8:29' }
+    ]
   };
+
+  function currentPlanDay(){
+    var anchor = new Date(state.season.startDate + 'T00:00:00');
+    var now = new Date(); now.setHours(0, 0, 0, 0);
+    var diffDays = Math.floor((now - anchor) / 86400000);
+    if (diffDays < 0) diffDays = 0;
+    return DEVOTIONAL_PLAN.days[diffDays % DEVOTIONAL_PLAN.days.length];
+  }
 
   function renderTimeline(){
     var el = document.getElementById('timeline');
@@ -909,11 +911,13 @@
 
   // ---------- Devotional ----------
   function renderDevotional(){
-    var d = state.devotional || DEFAULT_DEVOTIONAL;
+    var d = currentPlanDay();
+    var url = DEVOTIONAL_PLAN.baseUrl + '/day/' + d.day;
     document.getElementById('devotional-card').innerHTML =
-      '<div class="eyebrow" style="color:var(--gold);margin-bottom:8px;">' + escapeHtml(d.verse) + '</div>' +
-      '<h3 class="display" style="font-size:1.6rem;margin-bottom:14px;">' + escapeHtml(d.title) + '</h3>' +
-      '<p style="font-size:1rem;color:var(--ink-soft);line-height:1.7;margin:0;">' + escapeHtml(d.body) + '</p>';
+      '<div class="eyebrow" style="color:var(--gold);margin-bottom:8px;">Day ' + d.day + ' of ' + DEVOTIONAL_PLAN.days.length + ' · ' + escapeHtml(d.verse) + '</div>' +
+      '<h3 class="display" style="font-size:1.6rem;margin-bottom:10px;">' + escapeHtml(d.title) + '</h3>' +
+      '<p style="font-size:.92rem;color:var(--muted);margin:0 0 18px;">From <strong>' + escapeHtml(DEVOTIONAL_PLAN.title) + '</strong> — ' + escapeHtml(DEVOTIONAL_PLAN.source) + '</p>' +
+      '<a class="submit" style="display:inline-block;width:auto;text-decoration:none;" href="' + url + '" target="_blank" rel="noopener">Continue reading on the Bible App →</a>';
   }
 
   function populateAdminForms(){
@@ -922,10 +926,6 @@
     document.getElementById('admin-season-name').value = state.season.name;
     document.getElementById('admin-season-start').value = state.season.startDate;
     document.getElementById('admin-season-end').value = seasonEndDate(state.season.startDate, state.season.totalWeeks);
-    var d = state.devotional || DEFAULT_DEVOTIONAL;
-    document.getElementById('admin-dev-title').value = d.title;
-    document.getElementById('admin-dev-verse').value = d.verse;
-    document.getElementById('admin-dev-body').value = d.body;
   }
 
   // ---------- State ----------
@@ -934,7 +934,7 @@
     players: seed.players || [], teams: seed.teams || [], mode:'individual', activeTeamId:null,
     activeSport: DEFAULT_SEASON.activeSport,
     season: { name: DEFAULT_SEASON.name, startDate: DEFAULT_SEASON.startDate, totalWeeks: DEFAULT_SEASON.totalWeeks },
-    devotional: DEFAULT_DEVOTIONAL, matchups: {}
+    matchups: {}
   };
   var db = null;
   var unsubPlayers = null, unsubTeams = null;
@@ -1251,7 +1251,7 @@
       var payload = Object.assign({}, seasonMeta, { activeSport: state.activeSport, updatedAt: Date.now() });
       db.doc('settings/season').set(payload).then(function(){
         state.season = seasonMeta;
-        renderTimeline(); renderTicker(); renderSchedule(); applyActiveSport(state.activeSport);
+        renderTimeline(); renderTicker(); renderSchedule(); renderDevotional(); applyActiveSport(state.activeSport);
         if (document.getElementById('panel-admin').classList.contains('active')) renderAdminMatchups();
         showStatus('admin-season-status', totalWeeks + '-week season saved.', true);
         btn.disabled = false;
@@ -1267,38 +1267,6 @@
       renderTimeline(); renderTicker(); renderSchedule(); applyActiveSport(state.activeSport);
       renderAdminMatchups();
       showStatus('admin-season-status', totalWeeks + '-week season set locally — sign in on claude.ai to save for everyone.', true);
-      btn.disabled = false;
-    }
-  });
-
-  // ---------- Admin: weekly devotional ----------
-  document.getElementById('admin-devotional-form').addEventListener('submit', function(ev){
-    ev.preventDefault();
-    var btn = document.getElementById('admin-devotional-save');
-    var d = {
-      title: document.getElementById('admin-dev-title').value.trim(),
-      verse: document.getElementById('admin-dev-verse').value.trim(),
-      body: document.getElementById('admin-dev-body').value.trim(),
-      updatedAt: Date.now()
-    };
-    if (!d.title || !d.verse || !d.body){ showStatus('admin-devotional-status','Please fill in all three fields.', false); return; }
-    btn.disabled = true;
-    showStatus('admin-devotional-status', db ? 'Posting…' : 'Posting…', true);
-    if (db){
-      db.doc('settings/devotional').set(d).then(function(){
-        state.devotional = d; renderDevotional();
-        showStatus('admin-devotional-status', 'Devotional posted.', true);
-        btn.disabled = false;
-      }).catch(function(err){
-        var msg = (err && err.code === 'invalid_argument')
-          ? 'You need edit access to this page to post this — ask the owner to share it with you as an editor.'
-          : 'Could not post right now — please try again.';
-        showStatus('admin-devotional-status', msg, false);
-        btn.disabled = false;
-      });
-    } else {
-      state.devotional = d; renderDevotional();
-      showStatus('admin-devotional-status', 'Posted locally — sign in on claude.ai to save for everyone.', true);
       btn.disabled = false;
     }
   });
@@ -1479,11 +1447,7 @@
       renderTimeline(); renderTicker(); renderSchedule();
       if (document.getElementById('panel-admin').classList.contains('active')) renderAdminMatchups();
       applyActiveSport(d.activeSport || DEFAULT_SEASON.activeSport);
-    }, function(){ });
-
-    db.doc('settings/devotional').onSnapshot(function(snap){
-      state.devotional = snap.exists ? snap.data() : DEFAULT_DEVOTIONAL;
-      renderDevotional();
+      renderDevotional(); // the plan day depends on the season's start date
     }, function(){ });
 
     db.collection('matchups').onSnapshot(function(snap){
