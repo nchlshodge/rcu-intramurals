@@ -191,8 +191,7 @@
   .stat-tile .v .unit{ font-family:'JetBrains Mono',monospace; font-size:.85rem; color: var(--gold); font-weight:600; margin-left:4px; text-transform:none; letter-spacing:0; }
 
   /* ---------------- Timeline ---------------- */
-  .timeline{ display:grid; grid-template-columns: repeat(9,1fr); gap:6px; }
-  @media (max-width:760px){ .timeline{ grid-template-columns: repeat(3,1fr); } }
+  .timeline{ display:grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap:6px; }
   .timeline .wk{
     background: var(--surface); border:1px solid var(--line); border-radius:9px;
     padding:10px 8px; text-align:center; position:relative;
@@ -459,8 +458,8 @@
 
     <section id="season">
       <div class="section-head">
-        <h2>8-week season</h2>
-        <div class="sub">Sign-ups and the captain's draft run the week before Week 1, so every team gets a full 6-game regular season, single-elimination playoffs, and a championship night to close it out.</div>
+        <h2>Season schedule</h2>
+        <div class="sub">Sign-ups are open anytime before Week 1 — no deadline. Once games begin, every team plays a full regular season, single-elimination playoffs, and a championship night to close it out.</div>
       </div>
       <div class="card" style="padding:20px 22px;">
         <div class="timeline" id="timeline"></div>
@@ -475,7 +474,7 @@
       <div class="card" style="padding:22px 24px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
         <div>
           <div class="eyebrow" id="home-cta-eyebrow" style="margin-bottom:6px;">Fall 2026 · Volleyball</div>
-          <div class="display" style="font-size:1.3rem;">Sign-ups close at the end of pre-season week</div>
+          <div class="display" style="font-size:1.3rem;">Sign-ups are open now — no deadline until Week 1 begins</div>
         </div>
         <button class="submit" style="width:auto;" onclick="showTab('signup')">Sign up now →</button>
       </div>
@@ -706,16 +705,34 @@
 
     <div class="card" style="padding:20px 22px; margin-top:16px;">
       <h3 style="margin-bottom:6px;">Season dates</h3>
-      <p class="sub" style="margin-bottom:14px;">Set the season name and its start and end dates — every week on the Home timeline and every matchup's week date on the Schedule tab is calculated from these automatically.</p>
+      <p class="sub" style="margin-bottom:14px;">Set when the season actually starts (Week 1) and when it ends — sign-ups stay open the whole time before that, and every week's date on the Home timeline and every matchup's week date on the Schedule tab is calculated from these automatically.</p>
       <form class="signup" id="admin-season-form">
         <div class="field"><label for="admin-season-name">Season name</label><input id="admin-season-name" type="text" maxlength="30" required placeholder="e.g. Fall 2026"></div>
         <div class="field-row">
-          <div class="field"><label for="admin-season-start">Sign-up week starts</label><input id="admin-season-start" type="date" required></div>
+          <div class="field"><label for="admin-season-start">Season starts (Week 1)</label><input id="admin-season-start" type="date" required></div>
           <div class="field"><label for="admin-season-end">Championship week ends</label><input id="admin-season-end" type="date" required></div>
         </div>
+        <p class="form-note" style="margin-top:-6px;">Sign-ups are simply open any time before this date — there's no separate sign-up deadline to set.</p>
         <button type="submit" class="submit" id="admin-season-save">Save season dates</button>
         <div class="status-msg" id="admin-season-status" role="status"></div>
-        <p class="form-note">Must span at least 4 whole weeks (sign-ups, one regular week, playoffs, championship). Rounds to the nearest whole week if the gap isn't exact.</p>
+        <p class="form-note">Must span at least 3 whole weeks (one regular week, playoffs, championship). Rounds to the nearest whole week if the gap isn't exact.</p>
+      </form>
+    </div>
+
+    <div class="card" style="padding:20px 22px; margin-top:16px;">
+      <h3 style="margin-bottom:6px;">Devotional plan</h3>
+      <p class="sub" style="margin-bottom:14px;">Points the Devotional tab at a Life.Church Bible App reading plan (bible.com/reading-plans/…). One day advances per calendar day from the season's start date, wrapping back to Day 1 after the last day — swap this to a new plan whenever the current one finishes.</p>
+      <form class="signup" id="admin-devotional-form">
+        <div class="field"><label for="admin-dev-title">Plan title</label><input id="admin-dev-title" type="text" maxlength="80" required placeholder="e.g. Knowing Yourself (Part 1): You Are God's Image"></div>
+        <div class="field"><label for="admin-dev-url">Plan URL</label><input id="admin-dev-url" type="url" required placeholder="https://www.bible.com/reading-plans/12345-plan-name"></div>
+        <div class="field"><label for="admin-dev-days">Number of days</label><input id="admin-dev-days" type="number" min="1" max="365" required style="max-width:120px;"></div>
+        <div class="field">
+          <label for="admin-dev-details">Day titles &amp; verses (optional)</label>
+          <textarea id="admin-dev-details" class="field-textarea" rows="6" placeholder="One day per line: Title | Scripture reference&#10;e.g. Made in God's Image | Genesis 1:26"></textarea>
+        </div>
+        <button type="submit" class="submit" id="admin-devotional-save">Save devotional plan</button>
+        <div class="status-msg" id="admin-devotional-status" role="status"></div>
+        <p class="form-note">Leave day details blank (or shorter than the day count) to just show "Day N" for the missing days — the link to the Bible App works either way.</p>
       </form>
     </div>
 
@@ -762,12 +779,13 @@
   };
 
   // ---------- Season structure (admin-editable: name, start date, week count) ----------
-  // Every week after the start date is derived, not stored — the pre-season
-  // sign-up week is always week 0, the last two weeks are always playoffs
-  // and championship, and everything between is a regular week. Changing
+  // Every week after the start date is derived, not stored — Week 1 is
+  // always the start date, the last two weeks are always playoffs and
+  // championship, and everything between is a regular week. Sign-ups have
+  // no week of their own; they're just open any time before Week 1. Changing
   // the start date or week count in the Admin tab re-derives the whole
   // timeline, ticker, and matchup schedule from scratch.
-  var DEFAULT_SEASON = { name: 'Fall 2026', startDate: '2026-09-07', totalWeeks: 9, activeSport: 'Volleyball' };
+  var DEFAULT_SEASON = { name: 'Fall 2026', startDate: '2026-09-14', totalWeeks: 8, activeSport: 'Volleyball' };
 
   function addDaysISO(iso, days){
     var d = new Date(iso + 'T00:00:00');
@@ -779,16 +797,16 @@
     return addDaysISO(startDate, totalWeeks * 7 - 1);
   }
 
-  // Returns one entry per week: pre-season, N regular weeks, playoffs, championship.
+  // Returns one entry per week: N regular weeks, then playoffs, then
+  // championship. Sign-ups have no dedicated week of their own — they're
+  // simply open the whole time before Week 1 starts.
   function buildWeeks(startDate, totalWeeks){
-    var regularCount = totalWeeks - 3;
     var weeks = [];
     for (var i = 0; i < totalWeeks; i++){
       var start = addDaysISO(startDate, i * 7);
-      if (i === 0) weeks.push({ key:'pre', label:'Sign-ups', start:start, kind:'pre' });
-      else if (i === totalWeeks - 2) weeks.push({ key:'playoff', label:'Playoffs', start:start, kind:'playoff' });
+      if (i === totalWeeks - 2) weeks.push({ key:'playoff', label:'Playoffs', start:start, kind:'playoff' });
       else if (i === totalWeeks - 1) weeks.push({ key:'champ', label:'Championship', start:start, kind:'champ' });
-      else weeks.push({ key:i, label:'Week ' + i, start:start });
+      else weeks.push({ key:i + 1, label:'Week ' + (i + 1), start:start });
     }
     return weeks;
   }
@@ -807,29 +825,34 @@
     return w ? formatWeekRange(w.start) : '';
   }
 
-  // Devotional: a fixed 6-day Life.Church Bible App plan, cycling one day per
-  // real calendar day from the season's start date. No admin editing or
-  // database involved — it's the same for everyone, always in sync.
-  var DEVOTIONAL_PLAN = {
+  // Devotional: an admin-editable Life.Church Bible App reading plan, cycling
+  // one day per real calendar day from the season's start date. When one
+  // plan finishes, an admin points this at the next plan's URL from the
+  // Admin tab — no code changes needed.
+  var DEFAULT_DEVOTIONAL_PLAN = {
     title: "Knowing Yourself (Part 1): You Are God's Image",
-    source: 'Life.Church · Bible App',
     baseUrl: 'https://www.bible.com/reading-plans/72622-knowing-yourself-part-1-you-are-gods-image',
+    totalDays: 6,
     days: [
-      { day:1, title: "Made in God's Image", verse: 'Genesis 1:26' },
-      { day:2, title: 'Created After His Likeness', verse: 'Genesis 1:26; Romans 8:29' },
-      { day:3, title: 'The Dominion Dimension', verse: 'Psalm 8:4–6' },
-      { day:4, title: "Walking in Christ's Example", verse: 'Hebrews 1:3' },
-      { day:5, title: 'Free Will and Responsibility', verse: 'Genesis 2:16–17' },
-      { day:6, title: 'Becoming Fully You', verse: 'Romans 8:29' }
+      { title: "Made in God's Image", verse: 'Genesis 1:26' },
+      { title: 'Created After His Likeness', verse: 'Genesis 1:26; Romans 8:29' },
+      { title: 'The Dominion Dimension', verse: 'Psalm 8:4–6' },
+      { title: "Walking in Christ's Example", verse: 'Hebrews 1:3' },
+      { title: 'Free Will and Responsibility', verse: 'Genesis 2:16–17' },
+      { title: 'Becoming Fully You', verse: 'Romans 8:29' }
     ]
   };
 
   function currentPlanDay(){
+    var plan = state.devotionalPlan;
+    var totalDays = Math.max(1, plan.totalDays || (plan.days || []).length || 1);
     var anchor = new Date(state.season.startDate + 'T00:00:00');
     var now = new Date(); now.setHours(0, 0, 0, 0);
     var diffDays = Math.floor((now - anchor) / 86400000);
     if (diffDays < 0) diffDays = 0;
-    return DEVOTIONAL_PLAN.days[diffDays % DEVOTIONAL_PLAN.days.length];
+    var dayNumber = (diffDays % totalDays) + 1;
+    var meta = (plan.days && plan.days[dayNumber - 1]) || {};
+    return { day: dayNumber, total: totalDays, title: meta.title || ('Day ' + dayNumber), verse: meta.verse || '' };
   }
 
   function renderTimeline(){
@@ -845,7 +868,7 @@
       if (w.kind === 'playoff') cls += ' playoff';
       if (w.kind === 'champ') cls += ' champ';
       if (i === idx) cls += ' now';
-      var n = w.kind === 'pre' ? 'PRE' : (typeof w.key === 'number' ? 'WK ' + w.key : '');
+      var n = typeof w.key === 'number' ? 'WK ' + w.key : '';
       return '<div class="'+cls+'"><div class="n">'+n+'</div><div class="label">'+w.label+'</div><div class="range">'+formatWeekRange(w.start)+'</div></div>';
     }).join('');
   }
@@ -860,26 +883,25 @@
     var name = state.season.name;
     var countdownEl = document.getElementById('ticker-countdown');
 
-    // An admin can set a future season up ahead of time — "now" may fall
-    // before the sign-up week even begins.
+    // Sign-ups have no dedicated week — they're simply open any time before
+    // Week 1 starts, which is however far in the future that is.
     if (idx === -1){
-      document.getElementById('ticker-phase').textContent = name + ' · Not yet open';
+      document.getElementById('ticker-phase').textContent = name + ' · Sign-ups open';
       document.getElementById('hs-season').textContent = name;
       document.getElementById('hs-week').textContent = '—';
       var daysUntilOpen = Math.ceil((new Date(weeks[0].start) - now) / 86400000);
-      countdownEl.textContent = daysUntilOpen + ' day' + (daysUntilOpen===1?'':'s') + ' until sign-ups open';
+      countdownEl.textContent = daysUntilOpen + ' day' + (daysUntilOpen===1?'':'s') + ' until Week 1';
       return;
     }
 
     var current = weeks[idx];
     var next = weeks[idx+1];
-    var phase = current.kind === 'pre' ? name + ' · Sign-ups open' :
-                current.kind === 'champ' ? name + ' · Championship' :
+    var phase = current.kind === 'champ' ? name + ' · Championship' :
                 current.kind === 'playoff' ? name + ' · Playoffs' :
                 name + ' · ' + current.label;
     document.getElementById('ticker-phase').textContent = phase;
     document.getElementById('hs-season').textContent = name;
-    document.getElementById('hs-week').textContent = current.kind === 'pre' ? 'PRE' : (typeof current.key === 'number' ? current.key : '—');
+    document.getElementById('hs-week').textContent = typeof current.key === 'number' ? current.key : '—';
 
     if (next){
       var days = Math.ceil((new Date(next.start) - now) / 86400000);
@@ -912,12 +934,14 @@
   // ---------- Devotional ----------
   function renderDevotional(){
     var d = currentPlanDay();
-    var url = DEVOTIONAL_PLAN.baseUrl + '/day/' + d.day;
+    var plan = state.devotionalPlan;
+    var url = plan.baseUrl + '/day/' + d.day;
+    var eyebrow = 'Day ' + d.day + ' of ' + d.total + (d.verse ? ' · ' + escapeHtml(d.verse) : '');
     document.getElementById('devotional-card').innerHTML =
-      '<div class="eyebrow" style="color:var(--gold);margin-bottom:8px;">Day ' + d.day + ' of ' + DEVOTIONAL_PLAN.days.length + ' · ' + escapeHtml(d.verse) + '</div>' +
+      '<div class="eyebrow" style="color:var(--gold);margin-bottom:8px;">' + eyebrow + '</div>' +
       '<h3 class="display" style="font-size:1.6rem;margin-bottom:10px;">' + escapeHtml(d.title) + '</h3>' +
-      '<p style="font-size:.92rem;color:var(--muted);margin:0 0 18px;">From <strong>' + escapeHtml(DEVOTIONAL_PLAN.title) + '</strong> — ' + escapeHtml(DEVOTIONAL_PLAN.source) + '</p>' +
-      '<a class="submit" style="display:inline-block;width:auto;text-decoration:none;" href="' + url + '" target="_blank" rel="noopener">Continue reading on the Bible App →</a>';
+      '<p style="font-size:.92rem;color:var(--muted);margin:0 0 18px;">From <strong>' + escapeHtml(plan.title) + '</strong> — Life.Church · Bible App</p>' +
+      '<a class="submit" style="display:inline-block;width:auto;text-decoration:none;" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">Continue reading on the Bible App →</a>';
   }
 
   function populateAdminForms(){
@@ -926,6 +950,13 @@
     document.getElementById('admin-season-name').value = state.season.name;
     document.getElementById('admin-season-start').value = state.season.startDate;
     document.getElementById('admin-season-end').value = seasonEndDate(state.season.startDate, state.season.totalWeeks);
+    var plan = state.devotionalPlan;
+    document.getElementById('admin-dev-title').value = plan.title;
+    document.getElementById('admin-dev-url').value = plan.baseUrl;
+    document.getElementById('admin-dev-days').value = plan.totalDays;
+    document.getElementById('admin-dev-details').value = (plan.days || []).map(function(d){
+      return d.title + (d.verse ? ' | ' + d.verse : '');
+    }).join('\n');
   }
 
   // ---------- State ----------
@@ -934,6 +965,7 @@
     players: seed.players || [], teams: seed.teams || [], mode:'individual', activeTeamId:null,
     activeSport: DEFAULT_SEASON.activeSport,
     season: { name: DEFAULT_SEASON.name, startDate: DEFAULT_SEASON.startDate, totalWeeks: DEFAULT_SEASON.totalWeeks },
+    devotionalPlan: DEFAULT_DEVOTIONAL_PLAN,
     matchups: {}
   };
   var db = null;
@@ -1241,13 +1273,13 @@
     ev.preventDefault();
     var btn = document.getElementById('admin-season-save');
     var name = document.getElementById('admin-season-name').value.trim();
-    var start = document.getElementById('admin-season-start').value;
+    var start = document.getElementById('admin-season-start').value; // Week 1's start date
     var end = document.getElementById('admin-season-end').value;
     if (!name || !start || !end){ showStatus('admin-season-status', 'Please fill in all three fields.', false); return; }
     var diffDays = (new Date(end + 'T00:00:00') - new Date(start + 'T00:00:00')) / 86400000;
     var totalWeeks = Math.round((diffDays + 1) / 7);
-    if (diffDays < 0 || totalWeeks < 4){
-      showStatus('admin-season-status', 'Season must span at least 4 whole weeks (sign-ups, one regular week, playoffs, championship).', false);
+    if (diffDays < 0 || totalWeeks < 3){
+      showStatus('admin-season-status', 'Season must span at least 3 whole weeks (one regular week, playoffs, championship).', false);
       return;
     }
     btn.disabled = true;
@@ -1273,6 +1305,51 @@
       renderTimeline(); renderTicker(); renderSchedule(); applyActiveSport(state.activeSport);
       renderAdminMatchups();
       showStatus('admin-season-status', totalWeeks + '-week season set locally — sign in on claude.ai to save for everyone.', true);
+      btn.disabled = false;
+    }
+  });
+
+  // ---------- Admin: devotional plan ----------
+  document.getElementById('admin-devotional-form').addEventListener('submit', function(ev){
+    ev.preventDefault();
+    var btn = document.getElementById('admin-devotional-save');
+    var title = document.getElementById('admin-dev-title').value.trim();
+    var url = document.getElementById('admin-dev-url').value.trim().replace(/\/+$/, '');
+    var totalDays = parseInt(document.getElementById('admin-dev-days').value, 10);
+    var detailsRaw = document.getElementById('admin-dev-details').value;
+
+    if (!title || !url || !totalDays || totalDays < 1){
+      showStatus('admin-devotional-status', 'Please fill in the plan title, URL, and number of days.', false);
+      return;
+    }
+    if (!/^https:\/\/(www\.)?bible\.com\/reading-plans\/.+/.test(url)){
+      showStatus('admin-devotional-status', 'URL should look like https://www.bible.com/reading-plans/12345-plan-name', false);
+      return;
+    }
+
+    var days = detailsRaw.split('\n').map(function(line){ return line.trim(); }).filter(Boolean).map(function(line){
+      var parts = line.split('|');
+      return { title: (parts[0] || '').trim(), verse: (parts[1] || '').trim() };
+    });
+
+    var plan = { title: title, baseUrl: url, totalDays: totalDays, days: days, updatedAt: Date.now() };
+    btn.disabled = true;
+    showStatus('admin-devotional-status', db ? 'Saving…' : 'Saved on this device…', true);
+    if (db){
+      db.doc('settings/devotionalPlan').set(plan).then(function(){
+        state.devotionalPlan = plan; renderDevotional();
+        showStatus('admin-devotional-status', 'Devotional plan updated.', true);
+        btn.disabled = false;
+      }).catch(function(err){
+        var msg = (err && err.code === 'invalid_argument')
+          ? 'You need edit access to this page to change this — ask the owner to share it with you as an editor.'
+          : 'Could not save right now — please try again.';
+        showStatus('admin-devotional-status', msg, false);
+        btn.disabled = false;
+      });
+    } else {
+      state.devotionalPlan = plan; renderDevotional();
+      showStatus('admin-devotional-status', 'Saved locally — sign in on claude.ai to save for everyone.', true);
       btn.disabled = false;
     }
   });
@@ -1454,6 +1531,11 @@
       if (document.getElementById('panel-admin').classList.contains('active')) renderAdminMatchups();
       applyActiveSport(d.activeSport || DEFAULT_SEASON.activeSport);
       renderDevotional(); // the plan day depends on the season's start date
+    }, function(){ });
+
+    db.doc('settings/devotionalPlan').onSnapshot(function(snap){
+      state.devotionalPlan = snap.exists ? snap.data() : DEFAULT_DEVOTIONAL_PLAN;
+      renderDevotional();
     }, function(){ });
 
     db.collection('matchups').onSnapshot(function(snap){
