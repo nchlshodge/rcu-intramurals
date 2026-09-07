@@ -1138,19 +1138,25 @@
     return sport.toLowerCase().replace(/[^a-z0-9]+/g, '-') + '-w' + (weekIdx + 1) + '-' + pairIdx;
   }
 
-  function formatMatchupWhen(m){
-    if (!m || !m.date) return 'Time &amp; location TBD';
+  // Only ever names ONE specific day — never the week's full date range, so a
+  // team can't read this and think their game could be any day that week.
+  // Until an admin sets the real date, it says so plainly instead of
+  // guessing.
+  function formatMatchupWhen(m, weekNumber){
+    if (!m || !m.date){
+      var range = getRegularWeekDateLabel(weekNumber);
+      return escapeHtml('Date TBD' + (range ? ' — week of ' + range : ''));
+    }
     var parts = [];
     var d = new Date(m.date + 'T' + (m.time || '00:00'));
-    parts.push(d.toLocaleDateString(undefined, { weekday:'short', month:'short', day:'numeric' }));
+    parts.push(d.toLocaleDateString(undefined, { weekday:'long', month:'short', day:'numeric' }));
     if (m.time) parts.push(d.toLocaleTimeString(undefined, { hour:'numeric', minute:'2-digit' }));
     if (m.location) parts.push(m.location);
     return escapeHtml(parts.join(' · '));
   }
 
   function weekBadgeLabel(weekNumber){
-    var range = getRegularWeekDateLabel(weekNumber);
-    return 'Week ' + weekNumber + (range ? ' · ' + range : '');
+    return 'Week ' + weekNumber;
   }
 
   function renderSchedule(){
@@ -1183,7 +1189,7 @@
         var m = state.matchups[matchupId(schedSport, ri, pi)];
         return '<div class="matchup"><span class="wk-badge">'+wk+'</span>'+
           '<div class="versus">'+escapeHtml(p[0])+'<span class="x">VS</span>'+escapeHtml(p[1])+'</div>'+
-          '<div class="matchup-when">'+formatMatchupWhen(m)+'</div></div>';
+          '<div class="matchup-when">'+formatMatchupWhen(m, ri + 1)+'</div></div>';
       }).join('');
     }).join('');
   }
