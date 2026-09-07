@@ -202,6 +202,10 @@
   .timeline .wk.playoff{ background: var(--gold-tint); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
   .timeline .wk.champ{ background: var(--crimson); border-color: var(--crimson); }
   .timeline .wk.champ .label, .timeline .wk.champ .n, .timeline .wk.champ .range{ color:#fff; }
+  .timeline .wk.break{
+    background: repeating-linear-gradient(135deg, var(--surface-2), var(--surface-2) 6px, var(--paper) 6px, var(--paper) 12px);
+  }
+  .timeline .wk.break .label{ color: var(--muted); }
   .timeline .wk.now{ outline:2px solid var(--crimson); outline-offset:2px; }
   .timeline .wk.now::after{
     content:'NOW'; position:absolute; top:-9px; left:50%; transform:translateX(-50%);
@@ -705,17 +709,21 @@
 
     <div class="card" style="padding:20px 22px; margin-top:16px;">
       <h3 style="margin-bottom:6px;">Season dates</h3>
-      <p class="sub" style="margin-bottom:14px;">Set when the season actually starts (Week 1) and when it ends — sign-ups stay open the whole time before that, and every week's date on the Home timeline and every matchup's week date on the Schedule tab is calculated from these automatically.</p>
+      <p class="sub" style="margin-bottom:14px;">Set when the season actually starts (Week 1) and how many weeks of play it needs — sign-ups stay open the whole time before that, and every week's date on the Home timeline and every matchup's week date on the Schedule tab is calculated from these automatically.</p>
       <form class="signup" id="admin-season-form">
         <div class="field"><label for="admin-season-name">Season name</label><input id="admin-season-name" type="text" maxlength="30" required placeholder="e.g. Fall 2026"></div>
         <div class="field-row">
           <div class="field"><label for="admin-season-start">Season starts (Week 1)</label><input id="admin-season-start" type="date" required></div>
-          <div class="field"><label for="admin-season-end">Championship week ends</label><input id="admin-season-end" type="date" required></div>
+          <div class="field"><label for="admin-season-weeks">Weeks of play</label><input id="admin-season-weeks" type="number" min="3" max="52" required style="max-width:120px;"></div>
         </div>
-        <p class="form-note" style="margin-top:-6px;">Sign-ups are simply open any time before this date — there's no separate sign-up deadline to set.</p>
+        <p class="form-note" style="margin-top:-6px;">Includes regular season, playoffs, and championship — at least 3. Sign-ups are simply open any time before Week 1, with no separate deadline to set.</p>
+        <div class="field">
+          <label for="admin-season-breaks">Break weeks (optional)</label>
+          <textarea id="admin-season-breaks" class="field-textarea" rows="3" placeholder="One date per line, any day that week — e.g. Thanksgiving break:&#10;2026-11-26"></textarea>
+        </div>
+        <p class="form-note" style="margin-top:-6px;">A break skips that whole calendar week — no games, and every week after it shifts out by one week automatically. Pick any date inside the week you want off.</p>
         <button type="submit" class="submit" id="admin-season-save">Save season dates</button>
         <div class="status-msg" id="admin-season-status" role="status"></div>
-        <p class="form-note">Must span at least 3 whole weeks (one regular week, playoffs, championship). Rounds to the nearest whole week if the gap isn't exact.</p>
       </form>
     </div>
 
@@ -793,20 +801,43 @@
     return d.toISOString().slice(0, 10);
   }
 
-  function seasonEndDate(startDate, totalWeeks){
-    return addDaysISO(startDate, totalWeeks * 7 - 1);
+  // Snaps any date to the start of the 7-day grid cell it falls in, measured
+  // from the season's start date — so marking a holiday as a break week just
+  // means picking any day that week, not calculating the exact Monday.
+  function snapToWeekGrid(startDate, dateStr){
+    var start = new Date(startDate + 'T00:00:00');
+    var d = new Date(dateStr + 'T00:00:00');
+    var weekIndex = Math.floor((d - start) / (7 * 86400000));
+    return addDaysISO(startDate, weekIndex * 7);
   }
 
-  // Returns one entry per week: N regular weeks, then playoffs, then
-  // championship. Sign-ups have no dedicated week of their own — they're
-  // simply open the whole time before Week 1 starts.
-  function buildWeeks(startDate, totalWeeks){
+  // Returns one entry per calendar week from the start date: N game weeks
+  // (regular weeks, then playoffs, then championship) interleaved with any
+  // break weeks an admin has marked off (holidays) — a break consumes a
+  // calendar week but not a game-week slot, so the whole schedule just
+  // shifts later around it instead of anyone losing a week of play.
+  function buildWeeks(startDate, totalWeeks, skipWeeks){
+    var skipSet = {};
+    (skipWeeks || []).forEach(function(d){ skipSet[d] = true; });
     var weeks = [];
-    for (var i = 0; i < totalWeeks; i++){
-      var start = addDaysISO(startDate, i * 7);
-      if (i === totalWeeks - 2) weeks.push({ key:'playoff', label:'Playoffs', start:start, kind:'playoff' });
-      else if (i === totalWeeks - 1) weeks.push({ key:'champ', label:'Championship', start:start, kind:'champ' });
-      else weeks.push({ key:i + 1, label:'Week ' + (i + 1), start:start });
+    var gameIndex = 0;
+    var cursor = startDate;
+    var guard = 0;
+    while (gameIndex < totalWeeks && guard < 104){
+      guard++;
+      if (skipSet[cursor]){
+        weeks.push({ key:'break', label:'Break', start:cursor, kind:'break' });
+      } else if (gameIndex === totalWeeks - 2){
+        weeks.push({ key:'playoff', label:'Playoffs', start:cursor, kind:'playoff' });
+        gameIndex++;
+      } else if (gameIndex === totalWeeks - 1){
+        weeks.push({ key:'champ', label:'Championship', start:cursor, kind:'champ' });
+        gameIndex++;
+      } else {
+        weeks.push({ key:gameIndex + 1, label:'Week ' + (gameIndex + 1), start:cursor });
+        gameIndex++;
+      }
+      cursor = addDaysISO(cursor, 7);
     }
     return weeks;
   }
@@ -818,7 +849,7 @@
     return start.toLocaleDateString(undefined, opts) + '–' + end.toLocaleDateString(undefined, opts);
   }
 
-  function getWeeks(){ return buildWeeks(state.season.startDate, state.season.totalWeeks); }
+  function getWeeks(){ return buildWeeks(state.season.startDate, state.season.totalWeeks, state.season.skipWeeks); }
 
   function getRegularWeekDateLabel(weekNumber){
     var w = getWeeks().find(function(x){ return x.key === weekNumber; });
@@ -867,6 +898,7 @@
       var cls = 'wk';
       if (w.kind === 'playoff') cls += ' playoff';
       if (w.kind === 'champ') cls += ' champ';
+      if (w.kind === 'break') cls += ' break';
       if (i === idx) cls += ' now';
       var n = typeof w.key === 'number' ? 'WK ' + w.key : '';
       return '<div class="'+cls+'"><div class="n">'+n+'</div><div class="label">'+w.label+'</div><div class="range">'+formatWeekRange(w.start)+'</div></div>';
@@ -949,7 +981,8 @@
     if (sel) sel.value = state.activeSport;
     document.getElementById('admin-season-name').value = state.season.name;
     document.getElementById('admin-season-start').value = state.season.startDate;
-    document.getElementById('admin-season-end').value = seasonEndDate(state.season.startDate, state.season.totalWeeks);
+    document.getElementById('admin-season-weeks').value = state.season.totalWeeks;
+    document.getElementById('admin-season-breaks').value = (state.season.skipWeeks || []).join('\n');
     var plan = state.devotionalPlan;
     document.getElementById('admin-dev-title').value = plan.title;
     document.getElementById('admin-dev-url').value = plan.baseUrl;
@@ -964,7 +997,7 @@
   var state = {
     players: seed.players || [], teams: seed.teams || [], mode:'individual', activeTeamId:null,
     activeSport: DEFAULT_SEASON.activeSport,
-    season: { name: DEFAULT_SEASON.name, startDate: DEFAULT_SEASON.startDate, totalWeeks: DEFAULT_SEASON.totalWeeks },
+    season: { name: DEFAULT_SEASON.name, startDate: DEFAULT_SEASON.startDate, totalWeeks: DEFAULT_SEASON.totalWeeks, skipWeeks: [] },
     devotionalPlan: DEFAULT_DEVOTIONAL_PLAN,
     matchups: {}
   };
@@ -1274,24 +1307,31 @@
     var btn = document.getElementById('admin-season-save');
     var name = document.getElementById('admin-season-name').value.trim();
     var start = document.getElementById('admin-season-start').value; // Week 1's start date
-    var end = document.getElementById('admin-season-end').value;
-    if (!name || !start || !end){ showStatus('admin-season-status', 'Please fill in all three fields.', false); return; }
-    var diffDays = (new Date(end + 'T00:00:00') - new Date(start + 'T00:00:00')) / 86400000;
-    var totalWeeks = Math.round((diffDays + 1) / 7);
-    if (diffDays < 0 || totalWeeks < 3){
-      showStatus('admin-season-status', 'Season must span at least 3 whole weeks (one regular week, playoffs, championship).', false);
+    var totalWeeks = parseInt(document.getElementById('admin-season-weeks').value, 10);
+    if (!name || !start || !totalWeeks){ showStatus('admin-season-status', 'Please fill in the season name, start date, and number of weeks.', false); return; }
+    if (totalWeeks < 3){
+      showStatus('admin-season-status', 'Needs at least 3 weeks of play (one regular week, playoffs, championship).', false);
       return;
     }
+    var skipWeeks = document.getElementById('admin-season-breaks').value
+      .split('\n').map(function(line){ return line.trim(); }).filter(Boolean)
+      .filter(function(line){ return !isNaN(new Date(line + 'T00:00:00').getTime()); })
+      .map(function(line){ return snapToWeekGrid(start, line); });
+    skipWeeks = skipWeeks.filter(function(d, i){ return skipWeeks.indexOf(d) === i; }); // dedupe
+
     btn.disabled = true;
     showStatus('admin-season-status', db ? 'Saving…' : 'Saved on this device…', true);
-    var seasonMeta = { name: name, startDate: start, totalWeeks: totalWeeks };
+    var seasonMeta = { name: name, startDate: start, totalWeeks: totalWeeks, skipWeeks: skipWeeks };
+    var weeksPreview = buildWeeks(start, totalWeeks, skipWeeks);
+    var endLabel = formatWeekRange(weeksPreview[weeksPreview.length - 1].start).split('–')[1];
+    var confirmMsg = totalWeeks + '-week season saved — championship ends ' + endLabel + '.';
     if (db){
       var payload = Object.assign({}, seasonMeta, { activeSport: state.activeSport, updatedAt: Date.now() });
       db.doc('settings/season').set(payload).then(function(){
         state.season = seasonMeta;
         renderTimeline(); renderTicker(); renderSchedule(); renderDevotional(); applyActiveSport(state.activeSport);
         if (document.getElementById('panel-admin').classList.contains('active')) renderAdminMatchups();
-        showStatus('admin-season-status', totalWeeks + '-week season saved.', true);
+        showStatus('admin-season-status', confirmMsg, true);
         btn.disabled = false;
       }).catch(function(err){
         var msg = (err && err.code === 'invalid_argument')
@@ -1304,7 +1344,7 @@
       state.season = seasonMeta;
       renderTimeline(); renderTicker(); renderSchedule(); applyActiveSport(state.activeSport);
       renderAdminMatchups();
-      showStatus('admin-season-status', totalWeeks + '-week season set locally — sign in on claude.ai to save for everyone.', true);
+      showStatus('admin-season-status', confirmMsg + ' (set locally — sign in on claude.ai to save for everyone.)', true);
       btn.disabled = false;
     }
   });
@@ -1525,7 +1565,8 @@
       state.season = {
         name: d.name || DEFAULT_SEASON.name,
         startDate: d.startDate || DEFAULT_SEASON.startDate,
-        totalWeeks: d.totalWeeks || DEFAULT_SEASON.totalWeeks
+        totalWeeks: d.totalWeeks || DEFAULT_SEASON.totalWeeks,
+        skipWeeks: d.skipWeeks || []
       };
       renderTimeline(); renderTicker(); renderSchedule();
       if (document.getElementById('panel-admin').classList.contains('active')) renderAdminMatchups();

@@ -75,11 +75,15 @@ artifact's own sharing settings:
 Nothing here needs a code change — it's all managed live from the **Admin**
 tab and the **Sign Up** tab:
 
-- **Season dates** — season name, when Week 1 starts, and when the
-  championship week ends. Sign-ups have no week of their own; they're just
-  open any time before Week 1. Every week's date on the Home timeline and
-  every matchup's week date on the Schedule tab is calculated from these two
-  dates automatically.
+- **Season dates** — season name, when Week 1 starts, and how many weeks of
+  play the season needs (regular season + playoffs + championship — the end
+  date is calculated, not entered). Sign-ups have no week of their own;
+  they're just open any time before Week 1. Optionally list **break weeks**
+  (holidays) as one date per line — any day inside the week you want off;
+  that whole calendar week is skipped with no games, and every week after it
+  shifts out by one week automatically. Every week's date on the Home
+  timeline and every matchup's week date on the Schedule tab accounts for
+  this.
 - **Devotional plan** — when the current Life.Church Bible App reading plan
   finishes, point the Devotional tab at the next one: paste its
   [bible.com/reading-plans](https://www.bible.com/reading-plans) URL, its
