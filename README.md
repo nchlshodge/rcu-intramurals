@@ -2,7 +2,7 @@
 
 A single-page intramural sports app for RCU Campus Recreation — sign-ups, team
 rosters, auto-generated schedule & standings, a coordinator admin panel, a
-weekly devotional, and the program's coordinator handbook.
+daily Bible App reading, and the program's coordinator handbook.
 
 Everything lives in one self-contained file: **`rcu-intramurals.html`**. There's
 no build step and no server-side code — styling, markup, and logic are all
@@ -26,16 +26,17 @@ No dependencies to install. From this folder:
 python3 -m http.server 8743
 ```
 
-Then open `http://localhost:8743/rcu-intramurals.html`. Sign-ups, the admin
-panel, and the devotional will fall back to **local-only** state (stored in
-memory for that browser tab) since there's no live database outside of the
-hosted artifact — see below.
+Then open `http://localhost:8743/rcu-intramurals.html`. Sign-ups and the
+admin panel will fall back to **local-only** state (stored in memory for
+that browser tab) since there's no live database outside of the hosted
+artifact — see below. The Devotional tab works the same either way; it's
+computed from the date, not stored anywhere.
 
 ## Publishing as a Claude Artifact (live, shared data)
 
 The app is built to run as a [Claude Artifact](https://claude.ai/code/artifacts)
 with the `db` runtime capability, which gives it a real shared database:
-sign-ups, the active sport, the devotional, and game times all sync live
+sign-ups, the active sport, season dates, and game times all sync live
 across every visitor.
 
 To publish or update it:
@@ -52,9 +53,9 @@ To publish or update it:
      }
    }
    ```
-   The rules matter — they're what actually restricts the active-sport
-   setting, devotional, and game-time schedule to editors only. Everyone else
-   can still sign up and view every tab.
+   The rules matter — they're what actually restrict the active sport,
+   season dates, and game-time schedule to editors only. Everyone else can
+   still sign up and view every tab.
 
 ### Granting admin (coordinator) access
 
@@ -71,16 +72,22 @@ artifact's own sharing settings:
 
 ## Customizing for a new season
 
-A few things are hardcoded near the top of the `<script>` block and are worth
-updating each season:
+Season name, start date, and length aren't hardcoded — set them from the
+**Admin** tab's "Season dates" card, and every week's dates on the Home
+timeline and the Schedule tab recalculate automatically. `DEFAULT_SEASON`
+near the top of the `<script>` block is only the fallback shown before an
+admin has ever saved season dates.
 
-- **`SEASON`** — the season name and the anchor date for each of the 8 weeks
-  (pre-season, weeks 1–6, playoffs, championship).
-- **`DEFAULT_DEVOTIONAL`** — the devotional shown before an admin has posted
-  one through the Admin tab.
-- The four sport cards on the **Sports** tab (season/month labels) if the
-  rotation changes.
+The one thing that does live in the file is **`DEVOTIONAL_PLAN`** — the
+Life.Church Bible App reading plan the Devotional tab cycles through (one
+day per calendar day from the season's start date). Swap it for a different
+[bible.com/reading-plans](https://www.bible.com/reading-plans) plan by
+updating `baseUrl` and the `days` array (day number, title, scripture
+reference) to match.
 
-Everything else — active sport, devotional content, team sign-ups, and game
-times — is meant to be managed live from the **Admin** tab and the **Sign
-Up** tab, not by editing the file.
+Also worth a look each season: the four sport cards on the **Sports** tab
+(season/month labels), if the sport rotation changes.
+
+Everything else — active sport, season dates, game times, team sign-ups —
+is meant to be managed live from the **Admin** tab and the **Sign Up** tab,
+not by editing the file.
