@@ -445,6 +445,11 @@
   <!-- ===================== HOME ===================== -->
   <section class="panel active" id="panel-home">
 
+    <section id="announcement-card" class="card" style="padding:16px 18px; border-left:4px solid var(--gold);" hidden>
+      <div class="eyebrow" style="color:var(--gold); margin-bottom:4px;">Announcement</div>
+      <div id="announcement-text" style="font-size:.94rem; color: var(--ink-soft);"></div>
+    </section>
+
     <section id="install-card" class="card" style="padding:16px 18px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; border-left:4px solid var(--crimson);">
       <div>
         <div class="eyebrow" style="margin-bottom:4px;">Save this page</div>
@@ -695,6 +700,26 @@
     </div>
 
     <div class="card" style="padding:20px 22px; margin-top:20px;">
+      <h3 style="margin-bottom:6px;">Announcement</h3>
+      <p class="sub" style="margin-bottom:14px;">Shows in a banner at the top of the Home tab for every visitor — a rained-out game, a schedule change, whatever's time-sensitive. Leave it blank to hide the banner.</p>
+      <form class="signup" id="admin-announcement-form">
+        <div class="field">
+          <label for="admin-announcement-text">Message</label>
+          <textarea id="admin-announcement-text" class="field-textarea" rows="3" maxlength="300" placeholder="e.g. Tonight's volleyball games are moved to Court 2 due to a facility conflict."></textarea>
+        </div>
+        <div class="field-row">
+          <div class="field"><label for="admin-announcement-link">Link URL (optional)</label><input id="admin-announcement-link" type="url" placeholder="https://…"></div>
+          <div class="field"><label for="admin-announcement-link-text">Link text</label><input id="admin-announcement-link-text" type="text" maxlength="30" placeholder="e.g. Full details"></div>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button type="submit" class="submit" id="admin-announcement-save" style="width:auto;">Save announcement</button>
+          <button type="button" class="ghost-btn" id="admin-announcement-clear">Clear announcement</button>
+        </div>
+        <div class="status-msg" id="admin-announcement-status" role="status"></div>
+      </form>
+    </div>
+
+    <div class="card" style="padding:20px 22px; margin-top:16px;">
       <h3 style="margin-bottom:6px;">Now playing</h3>
       <p class="sub" style="margin-bottom:14px;">Drives the Home ticker, the sign-up shortcut, and the "Active" badge on the Sports tab for every visitor.</p>
       <div class="field-row" style="align-items:end;">
@@ -978,9 +1003,26 @@
       '<a class="submit" style="display:inline-block;width:auto;text-decoration:none;" href="' + escapeHtml(url) + '" target="_blank" rel="noopener">Continue reading on the Bible App →</a>';
   }
 
+  function renderAnnouncement(){
+    var a = state.announcement;
+    var card = document.getElementById('announcement-card');
+    if (!a || !a.text){ card.hidden = true; return; }
+    card.hidden = false;
+    var html = escapeHtml(a.text);
+    if (a.linkUrl){
+      html += ' <a href="' + escapeHtml(a.linkUrl) + '" target="_blank" rel="noopener" style="color:var(--crimson);font-weight:700;">' +
+        escapeHtml(a.linkText || 'Learn more') + ' →</a>';
+    }
+    document.getElementById('announcement-text').innerHTML = html;
+  }
+
   function populateAdminForms(){
     var sel = document.getElementById('admin-sport-select');
     if (sel) sel.value = state.activeSport;
+    var ann = state.announcement || {};
+    document.getElementById('admin-announcement-text').value = ann.text || '';
+    document.getElementById('admin-announcement-link').value = ann.linkUrl || '';
+    document.getElementById('admin-announcement-link-text').value = ann.linkText || '';
     document.getElementById('admin-season-name').value = state.season.name;
     document.getElementById('admin-season-start').value = state.season.startDate;
     document.getElementById('admin-season-weeks').value = state.season.totalWeeks;
@@ -1001,6 +1043,7 @@
     activeSport: DEFAULT_SEASON.activeSport,
     season: { name: DEFAULT_SEASON.name, startDate: DEFAULT_SEASON.startDate, totalWeeks: DEFAULT_SEASON.totalWeeks, skipWeeks: [] },
     devotionalPlan: DEFAULT_DEVOTIONAL_PLAN,
+    announcement: null,
     matchups: {}
   };
   var db = null;
@@ -1277,6 +1320,49 @@
     if (b) showTab(b.getAttribute('data-tab'));
   });
 
+  // ---------- Admin: announcement ----------
+  function saveAnnouncement(a, statusId, successMsg){
+    var btn = document.getElementById('admin-announcement-save');
+    var clearBtn = document.getElementById('admin-announcement-clear');
+    btn.disabled = true; clearBtn.disabled = true;
+    showStatus(statusId, db ? 'Saving…' : 'Saved on this device…', true);
+    if (db){
+      db.doc('settings/announcement').set(a).then(function(){
+        state.announcement = a; renderAnnouncement();
+        showStatus(statusId, successMsg, true);
+        btn.disabled = false; clearBtn.disabled = false;
+      }).catch(function(err){
+        var msg = (err && err.code === 'invalid_argument')
+          ? 'You need edit access to this page to change this — ask the owner to share it with you as an editor.'
+          : 'Could not save right now — please try again.';
+        showStatus(statusId, msg, false);
+        btn.disabled = false; clearBtn.disabled = false;
+      });
+    } else {
+      state.announcement = a; renderAnnouncement();
+      showStatus(statusId, successMsg + ' (set locally — sign in on claude.ai to save for everyone.)', true);
+      btn.disabled = false; clearBtn.disabled = false;
+    }
+  }
+
+  document.getElementById('admin-announcement-form').addEventListener('submit', function(ev){
+    ev.preventDefault();
+    var a = {
+      text: document.getElementById('admin-announcement-text').value.trim(),
+      linkUrl: document.getElementById('admin-announcement-link').value.trim(),
+      linkText: document.getElementById('admin-announcement-link-text').value.trim(),
+      updatedAt: Date.now()
+    };
+    saveAnnouncement(a, 'admin-announcement-status', a.text ? 'Announcement posted.' : 'Announcement cleared.');
+  });
+
+  document.getElementById('admin-announcement-clear').addEventListener('click', function(){
+    document.getElementById('admin-announcement-text').value = '';
+    document.getElementById('admin-announcement-link').value = '';
+    document.getElementById('admin-announcement-link-text').value = '';
+    saveAnnouncement({ text:'', linkUrl:'', linkText:'', updatedAt: Date.now() }, 'admin-announcement-status', 'Announcement cleared.');
+  });
+
   // ---------- Admin: now playing ----------
   document.getElementById('admin-sport-save').addEventListener('click', function(){
     var btn = this;
@@ -1542,6 +1628,7 @@
   renderRoster();
   applyActiveSport(state.activeSport);
   renderDevotional();
+  renderAnnouncement();
 
   // ---------- Wire up db capability (live, shared roster + admin settings) ----------
   (async function initDb(){
@@ -1579,6 +1666,11 @@
     db.doc('settings/devotionalPlan').onSnapshot(function(snap){
       state.devotionalPlan = snap.exists ? snap.data() : DEFAULT_DEVOTIONAL_PLAN;
       renderDevotional();
+    }, function(){ });
+
+    db.doc('settings/announcement').onSnapshot(function(snap){
+      state.announcement = snap.exists ? snap.data() : null;
+      renderAnnouncement();
     }, function(){ });
 
     db.collection('matchups').onSnapshot(function(snap){

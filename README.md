@@ -54,8 +54,9 @@ To publish or update it:
    }
    ```
    The rules matter — they're what actually restrict the active sport,
-   season dates, the devotional plan, and the game-time schedule to editors
-   only. Everyone else can still sign up and view every tab.
+   season dates, the devotional plan, the announcement banner, and the
+   game-time schedule to editors only. Everyone else can still sign up and
+   view every tab.
 
 ### Granting admin (coordinator) access
 
@@ -75,6 +76,11 @@ artifact's own sharing settings:
 Nothing here needs a code change — it's all managed live from the **Admin**
 tab and the **Sign Up** tab:
 
+- **Announcement** — a banner at the very top of the Home tab (a rained-out
+  game, a schedule change, whatever's time-sensitive), with an optional
+  link. Leave the message blank and save (or hit "Clear announcement") to
+  remove the banner entirely — it doesn't show at all when there's nothing
+  to say.
 - **Season dates** — season name, when Week 1 starts, and how many weeks of
   play the season needs (regular season + playoffs + championship — the end
   date is calculated, not entered). Sign-ups have no week of their own;
