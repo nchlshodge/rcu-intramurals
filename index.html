@@ -519,6 +519,14 @@
       <button type="button" class="ghost-btn" id="install-btn" hidden>Install app</button>
     </section>
 
+    <section id="notify-card" class="card" style="padding:16px 18px; display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap; border-left:4px solid var(--gold);">
+      <div>
+        <div class="eyebrow" style="margin-bottom:4px;">Stay in the loop</div>
+        <div id="notify-note" style="font-size:.92rem; color: var(--ink-soft);">Checking your browser…</div>
+      </div>
+      <button type="button" class="ghost-btn" id="notify-btn" hidden>Enable notifications</button>
+    </section>
+
     <section>
       <div class="stat-strip">
         <div class="stat-tile"><div class="k">Season</div><div class="v" id="hs-season">—</div></div>
@@ -2126,6 +2134,107 @@
     });
 
     window.addEventListener('appinstalled', function(){ card.hidden = true; });
+  })();
+
+  // ---------- Push notifications ----------
+  // Real Web Push (VAPID), no Firebase Cloud Messaging needed — a Cloud
+  // Function sends to every stored subscription in `pushSubscriptions` when
+  // an announcement, matchup schedule, or the devotional plan changes.
+  var VAPID_PUBLIC_KEY = 'BH7WloViGG_nUWOyY4WjOQ-u9XQfXnwgtDnKzymutIQxO_T_6jYiL9X3SykOXU26FNI0OTkXzQskwx4vAbW22cM';
+
+  function urlBase64ToUint8Array(base64String){
+    var padding = '='.repeat((4 - base64String.length % 4) % 4);
+    var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    var rawData = window.atob(base64);
+    var outputArray = new Uint8Array(rawData.length);
+    for (var i = 0; i < rawData.length; ++i){ outputArray[i] = rawData.charCodeAt(i); }
+    return outputArray;
+  }
+
+  function subscriptionDocId(endpoint){
+    var h = 0;
+    for (var i = 0; i < endpoint.length; i++){ h = (h * 31 + endpoint.charCodeAt(i)) | 0; }
+    return 'sub-' + (h >>> 0).toString(36);
+  }
+
+  (function initNotifyCard(){
+    var note = document.getElementById('notify-note');
+    var btn = document.getElementById('notify-btn');
+    var reg = null;
+
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !window.isSecureContext){
+      note.textContent = "This browser doesn't support notifications.";
+      return;
+    }
+
+    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (isIOS && !isStandalone){
+      note.textContent = 'Add this page to your Home Screen first (see above), then come back here to turn on notifications.';
+      return;
+    }
+
+    if (!db){
+      note.textContent = "Notifications need a connection — reload once you're back online.";
+      return;
+    }
+
+    function updateUI(sub){
+      if (Notification.permission === 'denied'){
+        note.textContent = 'Notifications are blocked for this site in your browser settings.';
+        btn.hidden = true;
+        return;
+      }
+      btn.hidden = false;
+      btn.disabled = false;
+      if (sub){
+        note.textContent = "You'll get a notification for new announcements, schedule changes, and devotional updates.";
+        btn.textContent = 'Turn off notifications';
+        btn.onclick = function(){ unsubscribe(sub); };
+      } else {
+        note.textContent = 'Get notified about announcements, schedule changes, and new devotional plans.';
+        btn.textContent = 'Enable notifications';
+        btn.onclick = subscribe;
+      }
+    }
+
+    function subscribe(){
+      btn.disabled = true;
+      Notification.requestPermission().then(function(perm){
+        if (perm !== 'granted'){ updateUI(null); return; }
+        reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        }).then(function(sub){
+          var json = sub.toJSON();
+          return db.collection('pushSubscriptions').doc(subscriptionDocId(sub.endpoint)).set({
+            endpoint: sub.endpoint,
+            keys: json.keys,
+            ts: Date.now()
+          }).then(function(){ updateUI(sub); });
+        }).catch(function(){
+          btn.disabled = false;
+          note.textContent = 'Could not turn on notifications — try again.';
+        });
+      });
+    }
+
+    function unsubscribe(sub){
+      btn.disabled = true;
+      var id = subscriptionDocId(sub.endpoint);
+      sub.unsubscribe().catch(function(){}).then(function(){
+        db.collection('pushSubscriptions').doc(id).delete().catch(function(){}).then(function(){
+          updateUI(null);
+        });
+      });
+    }
+
+    navigator.serviceWorker.register('sw.js').then(function(r){
+      reg = r;
+      return r.pushManager.getSubscription();
+    }).then(updateUI).catch(function(){
+      note.textContent = "Notifications aren't available right now.";
+    });
   })();
 
   // ---------- Init ----------

@@ -98,5 +98,18 @@ service cloud.firestore {
         && request.resource.data.members is list;
       allow delete: if isCoordinator();
     }
+
+    // Web Push subscriptions: one doc per browser, no login required (same
+    // "no account wall" philosophy as sign-ups). Reads are restricted to
+    // coordinators — an endpoint URL + keys shouldn't be publicly listable.
+    // Cloud Functions use the Admin SDK and bypass these rules entirely.
+    match /pushSubscriptions/{id} {
+      allow read: if isCoordinator();
+      allow create, update: if request.resource.data.keys().hasAll(['endpoint', 'keys', 'ts'])
+        && request.resource.data.endpoint is string && request.resource.data.endpoint.size() > 0 && request.resource.data.endpoint.size() < 500
+        && request.resource.data.keys is map
+        && request.resource.data.keys.keys().hasAll(['p256dh', 'auth']);
+      allow delete: if true;
+    }
   }
 }

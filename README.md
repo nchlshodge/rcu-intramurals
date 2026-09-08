@@ -20,13 +20,16 @@ for shared data — Cloud Firestore for the database, Firebase Authentication
 |-----------------------|------------------------------------------------------------------|
 | `index.html`          | The app itself (served at the site root by GitHub Pages)         |
 | `firestore.rules`     | Security rules — who can read/write what (see below)              |
-| `firebase.json`       | Points `firebase deploy` at `firestore.rules`                     |
+| `firebase.json`       | Points `firebase deploy` at `firestore.rules` and `functions/`    |
 | `.firebaserc`         | Pins the Firebase CLI to the `rcu-intramurals` project            |
 | `rcu-shield.png`      | RCU shield mark (source asset, pulled from rcu.edu)               |
 | `rcc-logo.png`        | RCC logo, full version                                            |
 | `rcc-logo-plain.png`  | RCC logo, plain version — used in the footer credit               |
 | `manifest.json`       | Web app manifest — name/icons/theme for "Add to Home Screen"      |
 | `apple-touch-icon.png`, `icon-192.png`, `icon-512.png` | App icon (RCU shield in a crimson/gold badge, "INTRAMURALS" banner) at the sizes iOS/Android look for |
+| `sw.js`               | Service worker — shows push notifications in the background       |
+| `functions/`          | Cloud Functions that send a push when an announcement, matchup, or the devotional plan changes |
+| `PUSH_NOTIFICATIONS_SETUP.md` | One-time setup for push notifications (Blaze plan, budget alert, deploying `functions/`) |
 
 ## Running it locally
 

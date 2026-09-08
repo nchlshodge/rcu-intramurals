@@ -2,5 +2,12 @@
   "firestore": {
     "rules": "firestore.rules",
     "database": "(default)"
-  }
+  },
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "runtime": "nodejs22"
+    }
+  ]
 }
