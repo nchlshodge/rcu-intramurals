@@ -640,7 +640,10 @@
       <h2>Schedule &amp; standings</h2>
       <div class="sub">Pulled live from registered teams. Once a sport has two or more teams signed up, a full round-robin regular season is generated automatically.</div>
     </div>
-    <div class="sport-tabs" id="sched-sport-tabs"></div>
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px;">
+      <div class="sport-tabs" id="sched-sport-tabs" style="margin-bottom:0;"></div>
+      <button type="button" class="ghost-btn" id="add-to-calendar-btn">+ Add to calendar</button>
+    </div>
     <div class="card" style="padding:20px 22px; overflow-x:auto;">
       <table class="standings" id="standings-table">
         <thead><tr><th>Team</th><th>W</th><th>L</th><th>Pts</th></tr></thead>
@@ -1550,6 +1553,8 @@
     renderSchedule();
   });
 
+  document.getElementById('add-to-calendar-btn').addEventListener('click', exportScheduleToCalendar);
+
   function roundRobin(teams){
     // Circle method. Returns array of rounds, each an array of [a,b] pairs.
     var list = teams.slice();
@@ -1597,6 +1602,97 @@
 
   function weekBadgeLabel(weekNumber){
     return 'Week ' + weekNumber;
+  }
+
+  // ---------- Add to calendar (.ics export) ----------
+  // Works whether or not any teams have registered yet: with 2+ teams it
+  // exports the real matchup schedule (exact game times where an admin has
+  // set them, otherwise a placeholder spanning that week); with none, it
+  // exports the season's own week structure so people can still put the
+  // season's cadence on their calendar before anyone's signed up.
+  function icsEscapeText(s){
+    return String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
+  }
+  function icsDateStamp(){
+    return new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  }
+  function addMinutesToTime(time, minutes){
+    var parts = (time || '00:00').split(':');
+    var total = (parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10) + minutes + 1440) % 1440;
+    var h = Math.floor(total / 60), m = total % 60;
+    return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+  }
+  function icsEventLines(ev){
+    var lines = ['BEGIN:VEVENT', 'UID:' + ev.uid + '@rcu-intramurals', 'DTSTAMP:' + icsDateStamp()];
+    if (ev.allDay){
+      lines.push('DTSTART;VALUE=DATE:' + ev.start.replace(/-/g, ''));
+      lines.push('DTEND;VALUE=DATE:' + (ev.end || addDaysISO(ev.start, 7)).replace(/-/g, ''));
+    } else {
+      lines.push('DTSTART:' + ev.date.replace(/-/g, '') + 'T' + ev.time.replace(':', '') + '00');
+      lines.push('DTEND:' + ev.date.replace(/-/g, '') + 'T' + ev.endTime.replace(':', '') + '00');
+    }
+    lines.push('SUMMARY:' + icsEscapeText(ev.title));
+    if (ev.location) lines.push('LOCATION:' + icsEscapeText(ev.location));
+    if (ev.description) lines.push('DESCRIPTION:' + icsEscapeText(ev.description));
+    lines.push('END:VEVENT');
+    return lines;
+  }
+  function downloadIcs(filename, events){
+    var lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//RCU Intramurals//EN', 'CALSCALE:GREGORIAN'];
+    events.forEach(function(ev){ lines = lines.concat(icsEventLines(ev)); });
+    lines.push('END:VCALENDAR');
+    var blob = new Blob([lines.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+  }
+  function weekKindLabel(w){
+    return w.kind === 'playoff' ? 'Playoffs' : w.kind === 'champ' ? 'Championship' : w.kind === 'break' ? 'Break — no games' : w.label;
+  }
+  function exportScheduleToCalendar(){
+    var sport = schedSport;
+    var teams = getSportTeams(sport);
+    var slug = sport.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    var events = [];
+
+    if (teams.length >= 2){
+      var rounds = roundRobin(teams.map(function(t){ return t.team; }));
+      rounds.forEach(function(pairs, ri){
+        var weekObj = getWeeks()[ri];
+        pairs.forEach(function(p, pi){
+          var id = matchupId(sport, ri, pi);
+          var m = state.matchups[id];
+          var title = sport + ': ' + p[0] + ' vs ' + p[1];
+          if (m && m.date){
+            events.push({
+              uid: 'match-' + id, title: title,
+              date: m.date, time: m.time || '00:00', endTime: addMinutesToTime(m.time || '00:00', 60),
+              location: m.location || '',
+              description: 'Week ' + (ri + 1) + ' — RCU Intramurals'
+            });
+          } else if (weekObj){
+            events.push({
+              uid: 'match-' + id + '-tbd', title: title + ' (date/time TBD)',
+              allDay: true, start: weekObj.start,
+              description: 'Week ' + (ri + 1) + ' — check the RCU Intramurals Schedule tab for the confirmed date and time.'
+            });
+          }
+        });
+      });
+    } else {
+      getWeeks().forEach(function(w){
+        events.push({
+          uid: 'season-' + slug + '-' + (typeof w.key === 'number' ? 'w' + w.key : w.kind),
+          title: sport + ' — ' + weekKindLabel(w),
+          allDay: true, start: w.start,
+          description: 'RCU Intramurals ' + state.season.name + '. Team match-ups appear here once teams register — check the Schedule tab for updates.'
+        });
+      });
+    }
+
+    downloadIcs(slug + '-schedule.ics', events);
   }
 
   function renderSchedule(){
