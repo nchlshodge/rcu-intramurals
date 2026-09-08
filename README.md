@@ -25,6 +25,8 @@ for shared data — Cloud Firestore for the database, Firebase Authentication
 | `rcu-shield.png`      | RCU shield mark (source asset, pulled from rcu.edu)               |
 | `rcc-logo.png`        | RCC logo, full version                                            |
 | `rcc-logo-plain.png`  | RCC logo, plain version — used in the footer credit               |
+| `manifest.json`       | Web app manifest — name/icons/theme for "Add to Home Screen"      |
+| `apple-touch-icon.png`, `icon-192.png`, `icon-512.png` | App icon (RCU shield in a crimson/gold badge, "INTRAMURALS" banner) at the sizes iOS/Android look for |
 
 ## Running it locally
 
