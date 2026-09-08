@@ -368,6 +368,13 @@
 
   /* ---------------- Admin ---------------- */
   .access-note{ padding:16px 18px; background: var(--gold-tint); border-color: color-mix(in srgb, var(--gold) 45%, var(--line)); }
+  .admin-sport-row{
+    border:1px solid var(--line); border-radius:11px; padding:14px 16px; background: var(--surface);
+    display:flex; flex-direction:column; gap:10px;
+  }
+  .admin-sport-row + .admin-sport-row{ margin-top:12px; }
+  .admin-sport-row .row-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .admin-sport-row .row-head .eyebrow{ margin:0; }
   .admin-matchup{
     display:flex; align-items:center; gap:10px; flex-wrap:wrap;
     padding:10px 12px; border-radius:10px; background: var(--surface); border:1px solid var(--line);
@@ -524,43 +531,9 @@
   <section class="panel" id="panel-sports">
     <div class="section-head">
       <h2>Sport line-up</h2>
-      <div class="sub">Four sports, one per season, timed to Michigan's calendar — indoor sports carry the cold months, outdoor sports take the shoulder seasons.</div>
+      <div class="sub">Timed to Michigan's calendar — indoor sports carry the cold months, outdoor sports take the shoulder seasons. Coordinators manage this list from the Admin tab.</div>
     </div>
-    <div class="sport-grid">
-
-      <div class="card sport-card">
-        <div class="head"><h3>Volleyball</h3><span class="pill active" data-sport-pill="Volleyball" data-season="Fall" data-month="Sep">Fall · Active</span></div>
-        <div class="meta"><span><b>6v6</b> co-rec</span><span><b>Indoor</b> · Warrior Gym</span><span><b>Roster</b> 8–10</span></div>
-        <p>Low equipment cost, one gym, quick sets (best of 3 to 21/21/15). The easiest season to open the year with.</p>
-        <ul class="gear"><li>Net, standards &amp; antennae, boundary tape</li><li>2–3 match balls</li></ul>
-        <button class="cta" onclick="signupForSport('Volleyball')">Sign up for Volleyball →</button>
-      </div>
-
-      <div class="card sport-card">
-        <div class="head"><h3>Basketball</h3><span class="pill upcoming" data-sport-pill="Basketball" data-season="Winter" data-month="Nov">Winter · Nov</span></div>
-        <div class="meta"><span><b>5v5</b> or 3v3</span><span><b>Indoor</b> · Warrior Gym</span><span><b>Roster</b> 8–12</span></div>
-        <p>Highest-demand sport on campus — expect the most teams and the most officiating need.</p>
-        <ul class="gear"><li>Game balls, scoreboard / shot clock</li><li>Reversible pinnies</li></ul>
-        <button class="cta" onclick="signupForSport('Basketball')">Sign up for Basketball →</button>
-      </div>
-
-      <div class="card sport-card">
-        <div class="head"><h3>Soccer</h3><span class="pill upcoming" data-sport-pill="Soccer" data-season="Spring" data-month="Mar">Spring · Mar</span></div>
-        <div class="meta"><span><b>7v7</b> outdoor</span><span><b>Field</b> · North Field</span><span><b>Roster</b> 10–14</span></div>
-        <p>Weather-dependent, so it fills whichever 8-week window the field calendar has open — with a rain-date week in reserve.</p>
-        <ul class="gear"><li>Portable goals &amp; nets, corner flags</li><li>Match balls, pinnies</li></ul>
-        <button class="cta" onclick="signupForSport('Soccer')">Sign up for Soccer →</button>
-      </div>
-
-      <div class="card sport-card">
-        <div class="head"><h3>Softball</h3><span class="pill upcoming" data-sport-pill="Softball" data-season="Late Spring" data-month="May">Late Spring · May</span></div>
-        <div class="meta"><span><b>Co-rec</b> slow-pitch</span><span><b>Field</b> · Diamond 1</span><span><b>Roster</b> 10–15</span></div>
-        <p>Runs last, once fields are reliably dry. Co-rec rules — every team bats a mixed lineup — keep it approachable.</p>
-        <ul class="gear"><li>Bases, pitching rubber, backstop</li><li>Bats, helmets, catcher's gear</li></ul>
-        <button class="cta" onclick="signupForSport('Softball')">Sign up for Softball →</button>
-      </div>
-
-    </div>
+    <div class="sport-grid" id="sports-cards"></div>
   </section>
 
   <!-- ===================== SIGN UP ===================== -->
@@ -585,9 +558,7 @@
             <div class="field-row">
               <div class="field">
                 <label for="f-sport">Sport</label>
-                <select id="f-sport" required>
-                  <option>Volleyball</option><option>Basketball</option><option>Soccer</option><option>Softball</option>
-                </select>
+                <select id="f-sport" required></select>
               </div>
               <div class="field">
                 <label for="f-year">Class year</label>
@@ -606,9 +577,7 @@
             <div class="field-row">
               <div class="field">
                 <label for="t-sport">Sport</label>
-                <select id="t-sport" required>
-                  <option>Volleyball</option><option>Basketball</option><option>Soccer</option><option>Softball</option>
-                </select>
+                <select id="t-sport" required></select>
               </div>
               <div class="field"><label for="t-captain-email">Your email (captain)</label><input id="t-captain-email" type="email" autocomplete="email" required maxlength="80"></div>
             </div>
@@ -647,12 +616,7 @@
       <h2>Schedule &amp; standings</h2>
       <div class="sub">Pulled live from registered teams. Once a sport has two or more teams signed up, a full round-robin regular season is generated automatically.</div>
     </div>
-    <div class="sport-tabs" id="sched-sport-tabs">
-      <button data-sport="Volleyball" aria-selected="true">Volleyball</button>
-      <button data-sport="Basketball" aria-selected="false">Basketball</button>
-      <button data-sport="Soccer" aria-selected="false">Soccer</button>
-      <button data-sport="Softball" aria-selected="false">Softball</button>
-    </div>
+    <div class="sport-tabs" id="sched-sport-tabs"></div>
     <div class="card" style="padding:20px 22px; overflow-x:auto;">
       <table class="standings" id="standings-table">
         <thead><tr><th>Team</th><th>W</th><th>L</th><th>Pts</th></tr></thead>
@@ -785,13 +749,22 @@
       <div class="field-row" style="align-items:end;">
         <div class="field">
           <label for="admin-sport-select">Active sport</label>
-          <select id="admin-sport-select">
-            <option>Volleyball</option><option>Basketball</option><option>Soccer</option><option>Softball</option>
-          </select>
+          <select id="admin-sport-select"></select>
         </div>
         <button type="button" class="submit" id="admin-sport-save">Set active sport</button>
       </div>
       <div class="status-msg" id="admin-sport-status" role="status" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="card" style="padding:20px 22px; margin-top:16px;">
+      <h3 style="margin-bottom:6px;">Sports</h3>
+      <p class="sub" style="margin-bottom:14px;">Add, remove, rename, or duplicate sports freely — run two volleyball leagues, drop a sport for the season, add a new indoor one, whatever the campus calendar needs. This list drives the Sports tab, the Sign Up sport picker, the Schedule tab, and Game Times below.</p>
+      <div id="admin-sports-list"></div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:14px;">
+        <button type="button" class="ghost-btn" id="admin-sports-add">+ Add sport</button>
+        <button type="button" class="submit" id="admin-sports-save" style="width:auto;">Save sports</button>
+      </div>
+      <div class="status-msg" id="admin-sports-status" role="status"></div>
     </div>
 
     <div class="card" style="padding:20px 22px; margin-top:16px;">
@@ -834,12 +807,7 @@
     <div class="card" style="padding:20px 22px; margin-top:16px;">
       <h3 style="margin-bottom:6px;">Game times</h3>
       <p class="sub" style="margin-bottom:14px;">Assign a date, time, and location to each matchup. Saved times appear on the Schedule tab for everyone.</p>
-      <div class="sport-tabs" id="admin-sport-tabs">
-        <button data-sport="Volleyball" aria-selected="true">Volleyball</button>
-        <button data-sport="Basketball" aria-selected="false">Basketball</button>
-        <button data-sport="Soccer" aria-selected="false">Soccer</button>
-        <button data-sport="Softball" aria-selected="false">Softball</button>
-      </div>
+      <div class="sport-tabs" id="admin-sport-tabs"></div>
       <div class="empty-note" id="admin-matchup-note" style="display:none;"></div>
       <div class="schedule-list" id="admin-matchup-list" style="margin-top:6px;"></div>
     </div>
@@ -865,13 +833,39 @@
 (function(){
   'use strict';
 
-  var SPORTS = ['Volleyball','Basketball','Soccer','Softball'];
-  var SPORT_COLORS = {
-    Volleyball: { bg:'var(--crimson-tint)', fg:'var(--crimson-deep)' },
-    Basketball: { bg:'var(--gold-tint)', fg:'#8a6a1f' },
-    Soccer: { bg:'var(--good-tint)', fg:'var(--good)' },
-    Softball: { bg:'var(--surface-2)', fg:'var(--ink-soft)' }
-  };
+  // The sport line-up is fully admin-editable (Admin tab -> Sports) so a
+  // coordinator can add, remove, rename, or duplicate sports freely — run
+  // two volleyball leagues, drop a sport for the season, add a new indoor
+  // one. DEFAULT_SPORTS is only the fallback shown before an admin has ever
+  // saved a real list.
+  var DEFAULT_SPORTS = [
+    { name:'Volleyball', season:'Fall', month:'Sep', format:'6v6 co-rec', location:'Indoor · Warrior Gym', roster:'8–10',
+      description:'Low equipment cost, one gym, quick sets (best of 3 to 21/21/15). The easiest season to open the year with.',
+      gear:['Net, standards & antennae, boundary tape', '2–3 match balls'] },
+    { name:'Basketball', season:'Winter', month:'Nov', format:'5v5 or 3v3', location:'Indoor · Warrior Gym', roster:'8–12',
+      description:'Highest-demand sport on campus — expect the most teams and the most officiating need.',
+      gear:['Game balls, scoreboard / shot clock', 'Reversible pinnies'] },
+    { name:'Soccer', season:'Spring', month:'Mar', format:'7v7 outdoor', location:'Field · North Field', roster:'10–14',
+      description:'Weather-dependent, so it fills whichever 8-week window the field calendar has open — with a rain-date week in reserve.',
+      gear:['Portable goals & nets, corner flags', 'Match balls, pinnies'] },
+    { name:'Softball', season:'Late Spring', month:'May', format:'Co-rec slow-pitch', location:'Field · Diamond 1', roster:'10–15',
+      description:"Runs last, once fields are reliably dry. Co-rec rules — every team bats a mixed lineup — keep it approachable.",
+      gear:['Bases, pitching rubber, backstop', "Bats, helmets, catcher's gear"] }
+  ];
+
+  var SPORT_COLOR_PALETTE = [
+    { bg:'var(--crimson-tint)', fg:'var(--crimson-deep)' },
+    { bg:'var(--gold-tint)', fg:'#8a6a1f' },
+    { bg:'var(--good-tint)', fg:'var(--good)' },
+    { bg:'var(--surface-2)', fg:'var(--ink-soft)' }
+  ];
+  // Deterministic per-name color so the same sport always renders the same
+  // chip color, without needing a fixed enum of known sport names.
+  function sportColor(name){
+    var hash = 0;
+    for (var i = 0; i < name.length; i++) hash = (hash * 31 + name.charCodeAt(i)) | 0;
+    return SPORT_COLOR_PALETTE[Math.abs(hash) % SPORT_COLOR_PALETTE.length];
+  }
 
   // ---------- Season structure (admin-editable: name, start date, week count) ----------
   // Every week after the start date is derived, not stored — Week 1 is
@@ -1030,14 +1024,73 @@
     }
   }
 
-  // ---------- Active sport (admin-controlled) ----------
-  function updateSportPills(activeSport){
-    Array.from(document.querySelectorAll('[data-sport-pill]')).forEach(function(el){
-      var sport = el.getAttribute('data-sport-pill');
-      var isActive = sport === activeSport;
-      el.className = 'pill ' + (isActive ? 'active' : 'upcoming');
-      el.textContent = el.getAttribute('data-season') + ' · ' + (isActive ? 'Active' : el.getAttribute('data-month'));
+  // ---------- Sport line-up: renders every part of the app that lists sports ----------
+  function renderSportsTab(){
+    var el = document.getElementById('sports-cards');
+    if (!state.sports.length){
+      el.innerHTML = '<div class="empty-note">No sports configured yet — add one from the Admin tab.</div>';
+      return;
+    }
+    el.innerHTML = state.sports.map(function(s){
+      var active = s.name === state.activeSport;
+      var pillCls = active ? 'pill active' : 'pill upcoming';
+      var pillText = escapeHtml(s.season || '') + (active ? ' · Active' : (s.month ? ' · ' + escapeHtml(s.month) : ''));
+      var gear = (s.gear || []).map(function(g){ return '<li>' + escapeHtml(g) + '</li>'; }).join('');
+      return '<div class="card sport-card">' +
+        '<div class="head"><h3>' + escapeHtml(s.name) + '</h3><span class="' + pillCls + '">' + pillText + '</span></div>' +
+        '<div class="meta">' +
+          (s.format ? '<span><b>' + escapeHtml(s.format) + '</b></span>' : '') +
+          (s.location ? '<span>' + escapeHtml(s.location) + '</span>' : '') +
+          (s.roster ? '<span><b>Roster</b> ' + escapeHtml(s.roster) + '</span>' : '') +
+        '</div>' +
+        (s.description ? '<p>' + escapeHtml(s.description) + '</p>' : '') +
+        (gear ? '<ul class="gear">' + gear + '</ul>' : '') +
+        '<button class="cta" data-sport-signup="' + escapeHtml(s.name) + '">Sign up for ' + escapeHtml(s.name) + ' →</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  function renderSportSelects(){
+    var names = state.sports.map(function(s){ return s.name; });
+    [document.getElementById('f-sport'), document.getElementById('t-sport')].forEach(function(sel){
+      var prev = sel.value;
+      sel.innerHTML = names.map(function(n){ return '<option>' + escapeHtml(n) + '</option>'; }).join('');
+      if (names.indexOf(prev) !== -1) sel.value = prev;
     });
+  }
+
+  function renderScheduleSportTabs(){
+    var names = state.sports.map(function(s){ return s.name; });
+    if (names.indexOf(schedSport) === -1) schedSport = names[0] || '';
+    document.getElementById('sched-sport-tabs').innerHTML = names.map(function(n){
+      return '<button data-sport="' + escapeHtml(n) + '" aria-selected="' + (n === schedSport) + '">' + escapeHtml(n) + '</button>';
+    }).join('');
+  }
+
+  function renderAdminSportTabs(){
+    var names = state.sports.map(function(s){ return s.name; });
+    if (names.indexOf(adminSport) === -1) adminSport = names[0] || '';
+    document.getElementById('admin-sport-tabs').innerHTML = names.map(function(n){
+      return '<button data-sport="' + escapeHtml(n) + '" aria-selected="' + (n === adminSport) + '">' + escapeHtml(n) + '</button>';
+    }).join('');
+  }
+
+  function renderAdminSportSelect(){
+    var sel = document.getElementById('admin-sport-select');
+    var names = state.sports.map(function(s){ return s.name; });
+    var prev = sel.value || state.activeSport;
+    sel.innerHTML = names.map(function(n){ return '<option>' + escapeHtml(n) + '</option>'; }).join('');
+    if (names.indexOf(prev) !== -1) sel.value = prev;
+  }
+
+  function renderAllSportLists(){
+    renderSportsTab();
+    renderSportSelects();
+    renderScheduleSportTabs();
+    renderAdminSportTabs();
+    renderAdminSportSelect();
+    renderSchedule();
+    if (document.getElementById('panel-admin').classList.contains('active')) renderAdminMatchups();
   }
 
   function applyActiveSport(sport){
@@ -1045,7 +1098,7 @@
     document.getElementById('ticker-sport').textContent = sport;
     var eyebrow = document.getElementById('home-cta-eyebrow');
     if (eyebrow) eyebrow.textContent = state.season.name + ' · ' + sport;
-    updateSportPills(sport);
+    renderSportsTab();
     var sel = document.getElementById('admin-sport-select');
     if (sel) sel.value = sport;
   }
@@ -1098,6 +1151,7 @@
     document.getElementById('admin-dev-details').value = (plan.days || []).map(function(d){
       return d.title + (d.verse ? ' | ' + d.verse : '');
     }).join('\n');
+    renderAdminSportsEditor(state.sports);
   }
 
   // ---------- State ----------
@@ -1108,6 +1162,7 @@
     season: { name: DEFAULT_SEASON.name, startDate: DEFAULT_SEASON.startDate, totalWeeks: DEFAULT_SEASON.totalWeeks, skipWeeks: [] },
     devotionalPlan: DEFAULT_DEVOTIONAL_PLAN,
     announcement: null,
+    sports: DEFAULT_SPORTS,
     matchups: {}
   };
   var db = null;
@@ -1140,7 +1195,7 @@
 
     all.sort(function(a,b){ return (b.ts||0) - (a.ts||0); });
     list.innerHTML = all.map(function(e){
-      var col = SPORT_COLORS[e.sport] || { bg:'var(--surface-2)', fg:'var(--ink-soft)' };
+      var col = sportColor(e.sport);
       if (e._kind === 'player'){
         return '<div class="entry"><div class="who"><div class="name">'+escapeHtml(e.name)+'</div><div class="sub">'+escapeHtml(e.year)+' · free agent</div></div>'+
           '<div class="sport-chip" style="background:'+col.bg+';color:'+col.fg+';">'+escapeHtml(e.sport)+'</div></div>';
@@ -1187,6 +1242,10 @@
     setMode('individual');
     document.getElementById('f-sport').value = sport;
   };
+  document.getElementById('sports-cards').addEventListener('click', function(ev){
+    var b = ev.target.closest('button[data-sport-signup]');
+    if (b) signupForSport(b.getAttribute('data-sport-signup'));
+  });
 
   // ---------- Forms (write-through to db when available) ----------
   document.getElementById('individual-form').addEventListener('submit', function(ev){
@@ -1425,6 +1484,86 @@
     document.getElementById('admin-announcement-link').value = '';
     document.getElementById('admin-announcement-link-text').value = '';
     saveAnnouncement({ text:'', linkUrl:'', linkText:'', updatedAt: Date.now() }, 'admin-announcement-status', 'Announcement cleared.');
+  });
+
+  // ---------- Admin: sports line-up ----------
+  var sportRowSeq = 0;
+  function sportRowHtml(s){
+    s = s || {};
+    var rowId = 'sr-' + (sportRowSeq++);
+    return '<div class="admin-sport-row" data-row-id="' + rowId + '">' +
+      '<div class="row-head"><span class="eyebrow">Sport</span><button type="button" class="ghost-btn sport-row-remove">Remove</button></div>' +
+      '<div class="field-row">' +
+        '<div class="field"><label>Name</label><input class="sr-name" maxlength="40" value="' + escapeHtml(s.name || '') + '" placeholder="e.g. Volleyball"></div>' +
+        '<div class="field"><label>Season label</label><input class="sr-season" maxlength="20" value="' + escapeHtml(s.season || '') + '" placeholder="e.g. Fall"></div>' +
+      '</div>' +
+      '<div class="field-row">' +
+        '<div class="field"><label>Month hint</label><input class="sr-month" maxlength="15" value="' + escapeHtml(s.month || '') + '" placeholder="e.g. Sep"></div>' +
+        '<div class="field"><label>Format</label><input class="sr-format" maxlength="40" value="' + escapeHtml(s.format || '') + '" placeholder="e.g. 6v6 co-rec"></div>' +
+      '</div>' +
+      '<div class="field-row">' +
+        '<div class="field"><label>Location</label><input class="sr-location" maxlength="40" value="' + escapeHtml(s.location || '') + '" placeholder="e.g. Indoor · Warrior Gym"></div>' +
+        '<div class="field"><label>Roster size</label><input class="sr-roster" maxlength="20" value="' + escapeHtml(s.roster || '') + '" placeholder="e.g. 8–10"></div>' +
+      '</div>' +
+      '<div class="field"><label>Description</label><textarea class="sr-desc field-textarea" rows="2">' + escapeHtml(s.description || '') + '</textarea></div>' +
+      '<div class="field"><label>Gear (one per line)</label><textarea class="sr-gear field-textarea" rows="2">' + escapeHtml((s.gear || []).join('\n')) + '</textarea></div>' +
+    '</div>';
+  }
+
+  function renderAdminSportsEditor(sports){
+    document.getElementById('admin-sports-list').innerHTML = (sports.length ? sports : [{}]).map(sportRowHtml).join('');
+  }
+
+  function collectSportsFromEditor(){
+    return Array.from(document.querySelectorAll('#admin-sports-list .admin-sport-row')).map(function(row){
+      return {
+        name: row.querySelector('.sr-name').value.trim(),
+        season: row.querySelector('.sr-season').value.trim(),
+        month: row.querySelector('.sr-month').value.trim(),
+        format: row.querySelector('.sr-format').value.trim(),
+        location: row.querySelector('.sr-location').value.trim(),
+        roster: row.querySelector('.sr-roster').value.trim(),
+        description: row.querySelector('.sr-desc').value.trim(),
+        gear: row.querySelector('.sr-gear').value.split('\n').map(function(l){ return l.trim(); }).filter(Boolean)
+      };
+    }).filter(function(s){ return s.name; });
+  }
+
+  document.getElementById('admin-sports-add').addEventListener('click', function(){
+    document.getElementById('admin-sports-list').insertAdjacentHTML('beforeend', sportRowHtml());
+  });
+  document.getElementById('admin-sports-list').addEventListener('click', function(ev){
+    var b = ev.target.closest('.sport-row-remove');
+    if (!b) return;
+    var rows = document.querySelectorAll('#admin-sports-list .admin-sport-row');
+    if (rows.length <= 1){ showStatus('admin-sports-status', 'Keep at least one sport, or just rename this one.', false); return; }
+    b.closest('.admin-sport-row').remove();
+  });
+  document.getElementById('admin-sports-save').addEventListener('click', function(){
+    var btn = document.getElementById('admin-sports-save');
+    var sports = collectSportsFromEditor();
+    if (!sports.length){ showStatus('admin-sports-status', 'Add at least one sport with a name.', false); return; }
+    btn.disabled = true;
+    showStatus('admin-sports-status', db ? 'Saving…' : 'Saved on this device…', true);
+    if (db){
+      db.doc('settings/sports').set({ list: sports, updatedAt: Date.now() }).then(function(){
+        state.sports = sports;
+        renderAllSportLists();
+        showStatus('admin-sports-status', sports.length + ' sport(s) saved.', true);
+        btn.disabled = false;
+      }).catch(function(err){
+        var msg = (err && err.code === 'permission-denied')
+          ? 'You need to be signed in as a coordinator to save this.'
+          : 'Could not save right now — please try again.';
+        showStatus('admin-sports-status', msg, false);
+        btn.disabled = false;
+      });
+    } else {
+      state.sports = sports;
+      renderAllSportLists();
+      showStatus('admin-sports-status', sports.length + ' sport(s) set locally — this device looks offline.', true);
+      btn.disabled = false;
+    }
   });
 
   // ---------- Admin: now playing ----------
@@ -1689,6 +1828,10 @@
   renderTicker();
   setInterval(renderTicker, 60000);
   setMode(state.mode);
+  renderSportSelects();
+  renderScheduleSportTabs();
+  renderAdminSportTabs();
+  renderAdminSportSelect();
   renderRoster();
   applyActiveSport(state.activeSport);
   renderDevotional();
@@ -1786,6 +1929,11 @@
     db.doc('settings/devotionalPlan').onSnapshot(function(snap){
       state.devotionalPlan = snap.exists ? snap.data() : DEFAULT_DEVOTIONAL_PLAN;
       renderDevotional();
+    }, function(){ });
+
+    db.doc('settings/sports').onSnapshot(function(snap){
+      state.sports = (snap.exists && snap.data().list && snap.data().list.length) ? snap.data().list : DEFAULT_SPORTS;
+      renderAllSportLists();
     }, function(){ });
 
     db.doc('settings/announcement').onSnapshot(function(snap){

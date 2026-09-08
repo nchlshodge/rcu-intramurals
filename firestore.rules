@@ -65,6 +65,14 @@ service cloud.firestore {
       allow write: if isCommissioner();
     }
 
+    // The sport line-up is admin-editable (not a fixed enum), so validation
+    // here is just "a reasonable non-empty string" rather than a specific
+    // list — coordinators/commissioners are trusted to keep settings/sports
+    // sensible, and can always clean up a stray sign-up value manually.
+    function isSportName(v) {
+      return v is string && v.size() > 0 && v.size() < 40;
+    }
+
     // Individual free-agent sign-ups: open to anyone, no login required,
     // with basic shape validation since this is now a public write path.
     match /players/{id} {
@@ -72,7 +80,7 @@ service cloud.firestore {
       allow create: if request.resource.data.keys().hasAll(['name', 'email', 'sport', 'year', 'ts'])
         && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() < 100
         && request.resource.data.email is string && request.resource.data.email.size() < 150
-        && request.resource.data.sport in ['Volleyball', 'Basketball', 'Soccer', 'Softball'];
+        && isSportName(request.resource.data.sport);
       allow update, delete: if isCoordinator();
     }
 
@@ -83,7 +91,7 @@ service cloud.firestore {
       allow read: if true;
       allow create: if request.resource.data.keys().hasAll(['team', 'sport', 'captainEmail', 'members', 'ts'])
         && request.resource.data.team is string && request.resource.data.team.size() > 0 && request.resource.data.team.size() < 100
-        && request.resource.data.sport in ['Volleyball', 'Basketball', 'Soccer', 'Softball']
+        && isSportName(request.resource.data.sport)
         && request.resource.data.members is list;
       allow update: if request.resource.data.team == resource.data.team
         && request.resource.data.sport == resource.data.sport

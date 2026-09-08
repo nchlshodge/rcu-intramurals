@@ -122,6 +122,12 @@ tab and the **Sign Up** tab:
   day count, and optionally each day's title/verse (one per line, as
   `Title | Verse`). One day advances per calendar day from the season's
   start date.
+- **Sports** — the sport line-up isn't a fixed list. Add, remove, rename, or
+  duplicate sports freely from the Admin tab's Sports card (run two
+  volleyball leagues, drop a sport for the season, add a new indoor one).
+  Each sport has a name, season label, month hint, format, location, roster
+  size, description, and gear list — this one list drives the Sports tab,
+  the Sign Up sport picker, the Schedule tab, and Game Times, all at once.
 - **Active sport**, **game times**, **team sign-ups** — same as always.
 
 `DEFAULT_SEASON` and `DEFAULT_DEVOTIONAL_PLAN` near the top of the
