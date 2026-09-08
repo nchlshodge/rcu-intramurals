@@ -1,0 +1,75 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userEmail() {
+      return isSignedIn() ? request.auth.token.email : null;
+    }
+
+    // Hardcoded owners can manage the coordinators list itself. Add more
+    // emails here directly (and redeploy rules) if ownership needs to
+    // expand beyond who's editing the Coordinators card in the app.
+    function isOwner() {
+      return isSignedIn() && userEmail() in [
+        'nick@rochesterchristian.church',
+        'nchlshodge@gmail.com'
+      ];
+    }
+
+    function isCoordinator() {
+      return isOwner() || (
+        isSignedIn() &&
+        exists(/databases/$(database)/documents/config/coordinators) &&
+        userEmail() in get(/databases/$(database)/documents/config/coordinators).data.emails
+      );
+    }
+
+    // Active sport, season dates, devotional plan, announcement banner.
+    match /settings/{doc} {
+      allow read: if true;
+      allow write: if isCoordinator();
+    }
+
+    // Per-matchup game date/time/location.
+    match /matchups/{doc} {
+      allow read: if true;
+      allow write: if isCoordinator();
+    }
+
+    // The coordinators allowlist itself — only an owner can change who's on it.
+    match /config/coordinators {
+      allow read: if isSignedIn();
+      allow write: if isOwner();
+    }
+
+    // Individual free-agent sign-ups: open to anyone, no login required,
+    // with basic shape validation since this is now a public write path.
+    match /players/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['name', 'email', 'sport', 'year', 'ts'])
+        && request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() < 100
+        && request.resource.data.email is string && request.resource.data.email.size() < 150
+        && request.resource.data.sport in ['Volleyball', 'Basketball', 'Soccer', 'Softball'];
+      allow update, delete: if isCoordinator();
+    }
+
+    // Team sign-ups: open create/update (adding members) so a captain never
+    // needs to log in, but the team's identity fields can't be hijacked
+    // once created, and only a coordinator can delete a team outright.
+    match /teams/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasAll(['team', 'sport', 'captainEmail', 'members', 'ts'])
+        && request.resource.data.team is string && request.resource.data.team.size() > 0 && request.resource.data.team.size() < 100
+        && request.resource.data.sport in ['Volleyball', 'Basketball', 'Soccer', 'Softball']
+        && request.resource.data.members is list;
+      allow update: if request.resource.data.team == resource.data.team
+        && request.resource.data.sport == resource.data.sport
+        && request.resource.data.members is list;
+      allow delete: if isCoordinator();
+    }
+  }
+}

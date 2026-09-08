@@ -14,6 +14,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <style>
   :root{
     color-scheme: light;
@@ -145,6 +148,23 @@
   .tabs button.tab-admin{ color: var(--gold); }
   .tabs button.tab-admin:hover{ color:#fff; }
   .tabs button.tab-admin[aria-selected="true"]{ background: var(--gold); color:#241a04; }
+
+  .auth-widget{ display:flex; align-items:center; flex-shrink:0; margin-left:10px; }
+  .auth-widget .ghost-btn{
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:.72rem; text-transform:uppercase;
+    background: rgba(255,255,255,.08); color:#e8e9ee; border:1px solid rgba(255,255,255,.16);
+    padding:8px 12px; border-radius:8px; cursor:pointer; white-space:nowrap;
+  }
+  .auth-widget .ghost-btn:hover{ background: rgba(255,255,255,.14); }
+  .auth-account{ display:flex; align-items:center; gap:8px; }
+  .auth-account[hidden]{ display:none; }
+  .auth-account img{ width:26px; height:26px; border-radius:50%; }
+  .auth-account span{ font-size:.8rem; font-weight:600; color:#e8e9ee; max-width:120px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .auth-account button{
+    font-family:'JetBrains Mono',monospace; font-size:.68rem; font-weight:700; text-transform:uppercase;
+    background:none; border:none; color:#9a9ca3; cursor:pointer; padding:4px;
+  }
+  .auth-account button:hover{ color:#fff; }
 
   .ticker{
     background: var(--charcoal-2); color:#d8d9de;
@@ -427,6 +447,14 @@
       <span class="tab-divider" id="admin-divider" aria-hidden="true" hidden></span>
       <button role="tab" data-tab="admin" aria-selected="false" class="tab-admin" id="admin-tab-btn" hidden>Admin</button>
     </nav>
+    <div class="auth-widget">
+      <button type="button" class="ghost-btn" id="auth-signin-btn">Sign in with Google</button>
+      <div class="auth-account" id="auth-account" hidden>
+        <img id="auth-avatar" alt="">
+        <span id="auth-name"></span>
+        <button type="button" id="auth-signout-btn" title="Sign out">Sign out</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -696,10 +724,23 @@
     </div>
 
     <div class="card access-note">
-      <strong>Coordinator access.</strong> Saving here requires edit access to this page — ask whoever owns it to share the page with you as an editor. Everyone else can still view every tab, just not change these settings.
+      <strong>Coordinator access.</strong> Saving here requires signing in with a Google account listed as a coordinator. Everyone else can still view every tab, just not change these settings.
     </div>
 
-    <div class="card" style="padding:20px 22px; margin-top:20px;">
+    <div class="card" id="owner-coordinators-card" style="padding:20px 22px; margin-top:20px;" hidden>
+      <h3 style="margin-bottom:6px;">Coordinators</h3>
+      <p class="sub" style="margin-bottom:14px;">Owner only. Anyone signed in with one of these email addresses sees this Admin tab and can save changes here. Add or remove people by editing the list and saving — no invite email is sent, they just sign in with Google using that address.</p>
+      <form class="signup" id="owner-coordinators-form">
+        <div class="field">
+          <label for="owner-coordinators-list">Coordinator emails (one per line)</label>
+          <textarea id="owner-coordinators-list" class="field-textarea" rows="5" placeholder="coach@rcu.edu&#10;coordinator@rochesterchristian.church"></textarea>
+        </div>
+        <button type="submit" class="submit" id="owner-coordinators-save" style="width:auto;">Save coordinators</button>
+        <div class="status-msg" id="owner-coordinators-status" role="status"></div>
+      </form>
+    </div>
+
+    <div class="card" style="padding:20px 22px; margin-top:16px;">
       <h3 style="margin-bottom:6px;">Announcement</h3>
       <p class="sub" style="margin-bottom:14px;">Shows in a banner at the top of the Home tab for every visitor — a rained-out game, a schedule change, whatever's time-sensitive. Leave it blank to hide the banner.</p>
       <form class="signup" id="admin-announcement-form">
@@ -1019,6 +1060,8 @@
   function populateAdminForms(){
     var sel = document.getElementById('admin-sport-select');
     if (sel) sel.value = state.activeSport;
+    var coordListEl = document.getElementById('owner-coordinators-list');
+    if (coordListEl) coordListEl.value = coordinatorEmails.join('\n');
     var ann = state.announcement || {};
     document.getElementById('admin-announcement-text').value = ann.text || '';
     document.getElementById('admin-announcement-link').value = ann.linkUrl || '';
@@ -1147,7 +1190,7 @@
     } else {
       entry.id = 'local-' + entry.ts;
       state.players.push(entry); renderRoster();
-      showStatus('individual-status', 'Added locally — sign in on claude.ai to save to the shared roster.', true);
+      showStatus('individual-status', 'Added locally — this device looks offline — reload after your connection is restored to save to the shared roster.', true);
       ev.target.reset(); btn.disabled = false;
     }
   });
@@ -1177,7 +1220,7 @@
       state.teams.push(entry); state.activeTeamId = entry.id;
       try { sessionStorage.setItem('rcu-active-team', entry.id); } catch(e){}
       renderRoster();
-      showStatus('team-setup-status', 'Team created locally — sign in on claude.ai to save to the shared roster.', true);
+      showStatus('team-setup-status', 'Team created locally — this device looks offline — reload after your connection is restored to save to the shared roster.', true);
       btn.disabled = false; setMode('team');
     }
   });
@@ -1332,15 +1375,15 @@
         showStatus(statusId, successMsg, true);
         btn.disabled = false; clearBtn.disabled = false;
       }).catch(function(err){
-        var msg = (err && err.code === 'invalid_argument')
-          ? 'You need edit access to this page to change this — ask the owner to share it with you as an editor.'
+        var msg = (err && err.code === 'permission-denied')
+          ? 'You need to be signed in with an email listed as a coordinator to change this — ask an owner to add your email in the Coordinators card.'
           : 'Could not save right now — please try again.';
         showStatus(statusId, msg, false);
         btn.disabled = false; clearBtn.disabled = false;
       });
     } else {
       state.announcement = a; renderAnnouncement();
-      showStatus(statusId, successMsg + ' (set locally — sign in on claude.ai to save for everyone.)', true);
+      showStatus(statusId, successMsg + ' (set locally — this device looks offline — reload after your connection is restored to save for everyone.)', true);
       btn.disabled = false; clearBtn.disabled = false;
     }
   }
@@ -1376,15 +1419,15 @@
         showStatus('admin-sport-status', sport + ' is now the active sport.', true);
         btn.disabled = false;
       }).catch(function(err){
-        var msg = (err && err.code === 'invalid_argument')
-          ? 'You need edit access to this page to change this — ask the owner to share it with you as an editor.'
+        var msg = (err && err.code === 'permission-denied')
+          ? 'You need to be signed in with an email listed as a coordinator to change this — ask an owner to add your email in the Coordinators card.'
           : 'Could not save right now — please try again.';
         showStatus('admin-sport-status', msg, false);
         btn.disabled = false;
       });
     } else {
       applyActiveSport(sport);
-      showStatus('admin-sport-status', sport + ' set locally — sign in on claude.ai to save for everyone.', true);
+      showStatus('admin-sport-status', sport + ' set locally — this device looks offline — reload after your connection is restored to save for everyone.', true);
       btn.disabled = false;
     }
   });
@@ -1422,8 +1465,8 @@
         showStatus('admin-season-status', confirmMsg, true);
         btn.disabled = false;
       }).catch(function(err){
-        var msg = (err && err.code === 'invalid_argument')
-          ? 'You need edit access to this page to change this — ask the owner to share it with you as an editor.'
+        var msg = (err && err.code === 'permission-denied')
+          ? 'You need to be signed in with an email listed as a coordinator to change this — ask an owner to add your email in the Coordinators card.'
           : 'Could not save right now — please try again.';
         showStatus('admin-season-status', msg, false);
         btn.disabled = false;
@@ -1432,7 +1475,7 @@
       state.season = seasonMeta;
       renderTimeline(); renderTicker(); renderSchedule(); applyActiveSport(state.activeSport);
       renderAdminMatchups();
-      showStatus('admin-season-status', confirmMsg + ' (set locally — sign in on claude.ai to save for everyone.)', true);
+      showStatus('admin-season-status', confirmMsg + ' (set locally — this device looks offline — reload after your connection is restored to save for everyone.)', true);
       btn.disabled = false;
     }
   });
@@ -1469,15 +1512,15 @@
         showStatus('admin-devotional-status', 'Devotional plan updated.', true);
         btn.disabled = false;
       }).catch(function(err){
-        var msg = (err && err.code === 'invalid_argument')
-          ? 'You need edit access to this page to change this — ask the owner to share it with you as an editor.'
+        var msg = (err && err.code === 'permission-denied')
+          ? 'You need to be signed in with an email listed as a coordinator to change this — ask an owner to add your email in the Coordinators card.'
           : 'Could not save right now — please try again.';
         showStatus('admin-devotional-status', msg, false);
         btn.disabled = false;
       });
     } else {
       state.devotionalPlan = plan; renderDevotional();
-      showStatus('admin-devotional-status', 'Saved locally — sign in on claude.ai to save for everyone.', true);
+      showStatus('admin-devotional-status', 'Saved locally — this device looks offline — reload after your connection is restored to save for everyone.', true);
       btn.disabled = false;
     }
   });
@@ -1552,7 +1595,7 @@
         renderSchedule();
         setTimeout(function(){ statusEl.textContent = ''; }, 2500);
       }).catch(function(err){
-        var msg = (err && err.code === 'invalid_argument') ? 'Need edit access to save this.' : 'Could not save — try again.';
+        var msg = (err && err.code === 'permission-denied') ? 'Need to be signed in as a coordinator to save this.' : 'Could not save — try again.';
         statusEl.textContent = msg; statusEl.className = 'am-status err';
         btn.disabled = false;
       });
@@ -1630,12 +1673,50 @@
   renderDevotional();
   renderAnnouncement();
 
-  // ---------- Wire up db capability (live, shared roster + admin settings) ----------
-  (async function initDb(){
-    try {
-      db = await window.claude && window.claude.use ? await window.claude.use('db') : null;
-    } catch(e){ db = null; }
-    if (!db) return;
+  // ---------- Firebase: auth + live shared data ----------
+  var FIREBASE_CONFIG = {
+    projectId: "rcu-intramurals",
+    appId: "1:538046866834:web:c4b027d2197e30799c0d4b",
+    storageBucket: "rcu-intramurals.firebasestorage.app",
+    apiKey: "AIzaSyBUqahZK7pRsd9ROtWBRx2Wk3xY3G6NU1k",
+    authDomain: "rcu-intramurals.firebaseapp.com",
+    messagingSenderId: "538046866834"
+  };
+
+  // Mirrors the hardcoded owner list in firestore.rules — an owner manages
+  // who's on the coordinators list; a coordinator manages everything else
+  // in the Admin tab. This client-side check only decides what to show;
+  // the rules are the actual enforcement either way.
+  var OWNER_EMAILS = ['nick@rochesterchristian.church', 'nchlshodge@gmail.com'];
+
+  var currentUser = null;
+  var coordinatorEmails = [];
+
+  function isOwnerEmail(email){ return !!email && OWNER_EMAILS.indexOf(email) !== -1; }
+  function isCoordinatorEmail(email){ return !!email && (isOwnerEmail(email) || coordinatorEmails.indexOf(email) !== -1); }
+
+  function updateAccessUI(){
+    var signedIn = !!currentUser;
+    var coordinator = signedIn && isCoordinatorEmail(currentUser.email);
+    var owner = signedIn && isOwnerEmail(currentUser.email);
+
+    document.getElementById('auth-signin-btn').hidden = signedIn;
+    document.getElementById('auth-account').hidden = !signedIn;
+    if (signedIn){
+      document.getElementById('auth-avatar').src = currentUser.photoURL || '';
+      document.getElementById('auth-name').textContent = currentUser.displayName || currentUser.email;
+    }
+
+    document.getElementById('admin-tab-btn').hidden = !coordinator;
+    document.getElementById('admin-divider').hidden = !coordinator;
+    if (!coordinator && document.getElementById('panel-admin').classList.contains('active')) showTab('home');
+
+    document.getElementById('owner-coordinators-card').hidden = !owner;
+  }
+
+  (function initFirebase(){
+    firebase.initializeApp(FIREBASE_CONFIG);
+    db = firebase.firestore();
 
     unsubPlayers = db.collection('players').orderBy('ts', 'desc').onSnapshot(function(snap){
       state.players = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); });
@@ -1681,15 +1762,46 @@
       if (document.getElementById('panel-admin').classList.contains('active')) renderAdminMatchups();
     }, function(){ });
 
-    // The Admin tab is admin-only. There's no per-viewer identity check available
-    // to this page, so access is inferred the only way the db capability exposes
-    // it: try a harmless write to an admin-only path and see if it's accepted.
-    // The write rules (declared in the publish capabilities) are the real gate —
-    // this just decides whether to show the tab; it never grants access itself.
-    db.doc('settings/_access_check').set({ checkedAt: Date.now() }).then(function(){
-      document.getElementById('admin-tab-btn').hidden = false;
-      document.getElementById('admin-divider').hidden = false;
-    }).catch(function(){ /* not an editor on this page — leave the tab hidden */ });
+    var unsubCoordinators = null;
+    firebase.auth().onAuthStateChanged(function(user){
+      currentUser = user;
+      if (unsubCoordinators){ unsubCoordinators(); unsubCoordinators = null; }
+      if (!user){ coordinatorEmails = []; updateAccessUI(); return; }
+      unsubCoordinators = db.doc('config/coordinators').onSnapshot(function(snap){
+        coordinatorEmails = (snap.exists && snap.data().emails) || [];
+        updateAccessUI();
+        if (document.getElementById('panel-admin').classList.contains('active')) populateAdminForms();
+      }, function(){ coordinatorEmails = []; updateAccessUI(); });
+    });
+
+    document.getElementById('auth-signin-btn').addEventListener('click', function(){
+      firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(err){
+        console.error('Sign-in failed', err);
+      });
+    });
+    document.getElementById('auth-signout-btn').addEventListener('click', function(){
+      firebase.auth().signOut();
+    });
+
+    document.getElementById('owner-coordinators-form').addEventListener('submit', function(ev){
+      ev.preventDefault();
+      var btn = document.getElementById('owner-coordinators-save');
+      var emails = document.getElementById('owner-coordinators-list').value
+        .split('\n').map(function(l){ return l.trim().toLowerCase(); }).filter(Boolean);
+      emails = emails.filter(function(e, i){ return emails.indexOf(e) === i; });
+      btn.disabled = true;
+      showStatus('owner-coordinators-status', 'Saving…', true);
+      db.doc('config/coordinators').set({ emails: emails, updatedAt: Date.now() }).then(function(){
+        showStatus('owner-coordinators-status', emails.length + ' coordinator(s) saved.', true);
+        btn.disabled = false;
+      }).catch(function(err){
+        var msg = (err && err.code === 'permission-denied')
+          ? 'Only an owner account can change this.'
+          : 'Could not save right now — please try again.';
+        showStatus('owner-coordinators-status', msg, false);
+        btn.disabled = false;
+      });
+    });
   })();
 
 })();

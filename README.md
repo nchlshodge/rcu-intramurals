@@ -4,19 +4,26 @@ A single-page intramural sports app for RCU Campus Recreation — sign-ups, team
 rosters, auto-generated schedule & standings, a coordinator admin panel, a
 daily Bible App reading, and the program's coordinator handbook.
 
-Everything lives in one self-contained file: **`rcu-intramurals.html`**. There's
-no build step and no server-side code — styling, markup, and logic are all
-inline, and the RCU shield / RCC logo / RCU Alumni Association mark are
-embedded as base64 images.
+**Live site:** https://nchlshodge.github.io/rcu-intramurals/
+
+The app itself is one self-contained file, **`index.html`** — no build step,
+styling/markup/logic all inline, RCU shield / RCC logo / RCU Alumni
+Association mark embedded as base64 images. It's hosted as a static site on
+**GitHub Pages** and backed by a real **Firebase** project (`rcu-intramurals`)
+for shared data — Cloud Firestore for the database, Firebase Authentication
+(Google Sign-In) for telling coordinators apart from everyone else.
 
 ## Files
 
-| File                    | Purpose                                              |
-|-------------------------|-------------------------------------------------------|
-| `rcu-intramurals.html`  | The app itself                                        |
-| `rcu-shield.png`        | RCU shield mark (source asset, pulled from rcu.edu)    |
-| `rcc-logo.png`          | RCC logo, full version                                 |
-| `rcc-logo-plain.png`    | RCC logo, plain version — used in the footer credit    |
+| File                  | Purpose                                                        |
+|-----------------------|------------------------------------------------------------------|
+| `index.html`          | The app itself (served at the site root by GitHub Pages)         |
+| `firestore.rules`     | Security rules — who can read/write what (see below)              |
+| `firebase.json`       | Points `firebase deploy` at `firestore.rules`                     |
+| `.firebaserc`         | Pins the Firebase CLI to the `rcu-intramurals` project            |
+| `rcu-shield.png`      | RCU shield mark (source asset, pulled from rcu.edu)               |
+| `rcc-logo.png`        | RCC logo, full version                                            |
+| `rcc-logo-plain.png`  | RCC logo, plain version — used in the footer credit               |
 
 ## Running it locally
 
@@ -26,50 +33,58 @@ No dependencies to install. From this folder:
 python3 -m http.server 8743
 ```
 
-Then open `http://localhost:8743/rcu-intramurals.html`. Sign-ups and
-everything set from the admin panel (active sport, season dates, the
-devotional plan, game times) will fall back to **local-only** state (stored
-in memory for that browser tab) since there's no live database outside of
-the hosted artifact — see below.
+Then open `http://localhost:8743/index.html`. This talks to the *real*
+`rcu-intramurals` Firebase project (same as the live site) — `localhost` is
+authorized for both Firestore and Google Sign-In by default, so sign-ups,
+sign-in, and admin changes made locally are real and shared, not a
+local-only sandbox.
 
-## Publishing as a Claude Artifact (live, shared data)
+## Architecture: GitHub Pages + Firebase
 
-The app is built to run as a [Claude Artifact](https://claude.ai/code/artifacts)
-with the `db` runtime capability, which gives it a real shared database:
-sign-ups, the active sport, season dates, the devotional plan, and game
-times all sync live across every visitor.
+There's no server of any kind — GitHub Pages serves the static file, and the
+Firebase Web SDK (loaded from `gstatic.com` in `index.html`) talks directly
+to Firestore/Auth from the browser. The Firebase config (project ID, API
+key, etc.) embedded in `index.html` is meant to be public — same as it would
+be in any Firebase web app — it's just an identifier, not a secret.
+Everything real is enforced server-side by `firestore.rules`.
 
-To publish or update it:
+### Deploying rule changes
 
-1. Open the file in a Claude Code session.
-2. Publish it as an Artifact with:
-   ```json
-   {
-     "db": {
-       "rules": [
-         { "path": "settings", "write": "admin" },
-         { "path": "matchups", "write": "admin" }
-       ]
-     }
-   }
-   ```
-   The rules matter — they're what actually restrict the active sport,
-   season dates, the devotional plan, the announcement banner, and the
-   game-time schedule to editors only. Everyone else can still sign up and
-   view every tab.
+If you edit `firestore.rules`, push the change live with:
 
-### Granting admin (coordinator) access
+```bash
+firebase deploy --only firestore:rules --project rcu-intramurals
+```
 
-There's no login system — access is controlled entirely through the
-artifact's own sharing settings:
+(Requires the Firebase CLI, `firebase login` as an account with access to
+the project — currently `nchlshodge@gmail.com`.)
 
-- Share the artifact link as **"can edit"** with intramural coordinators.
-  They'll see the **Admin** tab (it silently tests write access on load and
-  only reveals itself when the test succeeds).
-- Share it as **"can view"** (or just hand out the link) with everyone else.
-  They can sign up, view schedules, and read the devotional, but the Admin
-  tab stays hidden and any attempt to write to `settings/*` or `matchups/*`
-  is rejected by the database rules above.
+### Granting coordinator / owner access
+
+There's no separate account system — access is entirely about which Google
+email is signed in, checked two ways:
+
+- **Coordinators** — anyone signed in with Google using an email on the
+  **Coordinators** list (Admin tab → Coordinators card, owner-only) sees the
+  **Admin** tab and can save season dates, the devotional plan, the
+  announcement, active sport, and game times. No invite email is sent —
+  just add their email to the list and tell them to sign in with Google
+  using that address.
+- **Owners** — a short hardcoded list of emails in `firestore.rules`
+  (`isOwner()`, currently `nick@rochesterchristian.church` and
+  `nchlshodge@gmail.com`) who can additionally edit the Coordinators list
+  itself. Changing who's an owner means editing that function in
+  `firestore.rules` and redeploying — everything else is manageable from
+  the app.
+- **Everyone else** — no sign-in required to sign up as a free agent or
+  register a team (see `firestore.rules` for the exact shape validation on
+  those writes). They can view every tab; any write to `settings/*` or
+  `matchups/*` is rejected by the rules regardless of what the UI shows.
+
+If you ever host this somewhere other than `nchlshodge.github.io` or
+`localhost`, add that domain under **Authentication → Settings →
+Authorized domains** in the [Firebase console](https://console.firebase.google.com/project/rcu-intramurals/authentication/settings) —
+Google Sign-In will fail with `auth/unauthorized-domain` otherwise.
 
 ## Customizing for a new season
 
