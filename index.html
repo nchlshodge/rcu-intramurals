@@ -1338,7 +1338,11 @@
     var coordListEl = document.getElementById('owner-coordinators-list');
     if (coordListEl) coordListEl.value = coordinatorEmails.join('\n');
     var commListEl = document.getElementById('owner-commissioners-list');
-    if (commListEl) commListEl.value = commissionerEmails.join('\n');
+    // The bootstrap emails always have commissioner access but are never
+    // written to config/commissioners, so the box would otherwise look
+    // empty even when access clearly isn't. Showing them here means Save
+    // also "graduates" them into the self-service list.
+    if (commListEl) commListEl.value = (commissionerEmails.length ? commissionerEmails : BOOTSTRAP_COMMISSIONER_EMAILS).join('\n');
     var ann = state.announcement || {};
     document.getElementById('admin-announcement-text').value = ann.text || '';
     document.getElementById('admin-announcement-link').value = ann.linkUrl || '';
@@ -2088,8 +2092,11 @@
   // Opens the viewer's own mail client pre-addressed and pre-written — this
   // never sends anything itself, it just drafts, and the person reviews and
   // hits send themselves.
-  function draftInviteEmail(emails, roleLabel){
-    if (!emails.length) return;
+  function draftInviteEmail(emails, roleLabel, statusId){
+    if (!emails.length){
+      if (statusId) showStatus(statusId, 'Add at least one email above first, then try again.', false);
+      return;
+    }
     var siteUrl = window.location.origin + window.location.pathname;
     var subject = 'You have been added as an RCU Intramurals ' + roleLabel;
     var body = "Hi,\n\nYou've been added as a " + roleLabel + " for the RCU Intramurals app:\n" + siteUrl +
@@ -2097,6 +2104,21 @@
       " where you can manage things.\n";
     window.location.href = 'mailto:' + emails.join(',') +
       '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+    // mailto: fails completely silently when the device has no default mail
+    // app configured — no error, no event to catch. So this always shows a
+    // fallback with the same text, rather than trusting the redirect worked.
+    if (statusId){
+      var fallback = 'To: ' + emails.join(', ') + ' — Subject: ' + subject + ' — ' + body.replace(/\n/g, ' ');
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        navigator.clipboard.writeText(fallback).then(function(){
+          showStatus(statusId, 'Opening your mail app — if nothing happens, the message text was just copied to your clipboard to paste into an email yourself.', true);
+        }).catch(function(){
+          showStatus(statusId, 'Opening your mail app — if nothing happens: ' + fallback, true);
+        });
+      } else {
+        showStatus(statusId, 'Opening your mail app — if nothing happens: ' + fallback, true);
+      }
+    }
   }
 
   (function initFirebase(){
@@ -2211,10 +2233,10 @@
       'config/commissioners', 'commissioner', 'Only a commissioner account can change this.');
 
     document.getElementById('owner-coordinators-invite').addEventListener('click', function(){
-      draftInviteEmail(parseEmailList('owner-coordinators-list'), 'coordinator');
+      draftInviteEmail(parseEmailList('owner-coordinators-list'), 'coordinator', 'owner-coordinators-status');
     });
     document.getElementById('owner-commissioners-invite').addEventListener('click', function(){
-      draftInviteEmail(parseEmailList('owner-commissioners-list'), 'commissioner');
+      draftInviteEmail(parseEmailList('owner-commissioners-list'), 'commissioner', 'owner-commissioners-status');
     });
   })();
 
