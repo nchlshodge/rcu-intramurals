@@ -59,27 +59,38 @@ firebase deploy --only firestore:rules --project rcu-intramurals
 (Requires the Firebase CLI, `firebase login` as an account with access to
 the project — currently `nchlshodge@gmail.com`.)
 
-### Granting coordinator / owner access
+### Granting coordinator / commissioner access
 
 There's no separate account system — access is entirely about which Google
-email is signed in, checked two ways:
+email is signed in, checked three ways:
 
 - **Coordinators** — anyone signed in with Google using an email on the
-  **Coordinators** list (Admin tab → Coordinators card, owner-only) sees the
-  **Admin** tab and can save season dates, the devotional plan, the
-  announcement, active sport, and game times. No invite email is sent —
-  just add their email to the list and tell them to sign in with Google
-  using that address.
-- **Owners** — a short hardcoded list of emails in `firestore.rules`
-  (`isOwner()`, currently `nick@rochesterchristian.church` and
-  `nchlshodge@gmail.com`) who can additionally edit the Coordinators list
-  itself. Changing who's an owner means editing that function in
-  `firestore.rules` and redeploying — everything else is manageable from
-  the app.
+  **Coordinators** list (Admin tab → Access & invites, commissioner-only)
+  sees the **Admin** tab and can save season dates, the devotional plan,
+  the announcement, active sport, and game times.
+- **Commissioners** — run the whole program. Same access as coordinators,
+  plus they manage both the Coordinators and Commissioners lists themselves,
+  fully self-service, right from the Access & invites card — adding or
+  removing either kind of access is just editing a list and hitting Save,
+  no redeploy needed.
+- **Bootstrap fallback** — a short hardcoded list of emails in
+  `firestore.rules` (`isBootstrapCommissioner()`, currently
+  `nick@rochesterchristian.church` and `nchlshodge@gmail.com`) that always
+  has commissioner access no matter what's in the Commissioners list. This
+  is a safety net so access can never be fully locked out — it's not meant
+  to be the day-to-day way people get access. Changing it means editing
+  that function in `firestore.rules` and redeploying.
 - **Everyone else** — no sign-in required to sign up as a free agent or
   register a team (see `firestore.rules` for the exact shape validation on
-  those writes). They can view every tab; any write to `settings/*` or
-  `matchups/*` is rejected by the rules regardless of what the UI shows.
+  those writes). They can view every tab; any write to `settings/*`,
+  `matchups/*`, or `config/*` is rejected by the rules regardless of what
+  the UI shows.
+
+Neither role sends a real invite email (there's no backend for that on the
+free Firebase plan) — the "Draft invite email" button next to each list
+just opens *your own* mail client, addressed to whoever's in that list, with
+the site link and instructions already written. You review and hit send
+yourself.
 
 If you ever host this somewhere other than `nchlshodge.github.io` or
 `localhost`, add that domain under **Authentication → Settings →

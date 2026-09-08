@@ -10,18 +10,32 @@ service cloud.firestore {
       return isSignedIn() ? request.auth.token.email : null;
     }
 
-    // Hardcoded owners can manage the coordinators list itself. Add more
-    // emails here directly (and redeploy rules) if ownership needs to
-    // expand beyond who's editing the Coordinators card in the app.
-    function isOwner() {
+    // Permanent bootstrap fallback ONLY — not the day-to-day commissioner
+    // list (that's config/commissioners, managed from the app). This exists
+    // so access can never be fully locked out even if that list is ever
+    // emptied by mistake. Changing this requires editing this file and
+    // redeploying; everything else is self-service from the Admin tab.
+    function isBootstrapCommissioner() {
       return isSignedIn() && userEmail() in [
         'nick@rochesterchristian.church',
         'nchlshodge@gmail.com'
       ];
     }
 
+    // Commissioners run the whole program: they manage both the
+    // commissioners list and the coordinators list, in-app, no redeploy.
+    function isCommissioner() {
+      return isBootstrapCommissioner() || (
+        isSignedIn() &&
+        exists(/databases/$(database)/documents/config/commissioners) &&
+        userEmail() in get(/databases/$(database)/documents/config/commissioners).data.emails
+      );
+    }
+
+    // Coordinators run day-to-day admin (season, devotional, game times,
+    // announcements) but can't change who has access.
     function isCoordinator() {
-      return isOwner() || (
+      return isCommissioner() || (
         isSignedIn() &&
         exists(/databases/$(database)/documents/config/coordinators) &&
         userEmail() in get(/databases/$(database)/documents/config/coordinators).data.emails
@@ -40,10 +54,15 @@ service cloud.firestore {
       allow write: if isCoordinator();
     }
 
-    // The coordinators allowlist itself — only an owner can change who's on it.
+    // The coordinators and commissioners allowlists — a commissioner
+    // manages both, self-service, from the app.
     match /config/coordinators {
       allow read: if isSignedIn();
-      allow write: if isOwner();
+      allow write: if isCommissioner();
+    }
+    match /config/commissioners {
+      allow read: if isSignedIn();
+      allow write: if isCommissioner();
     }
 
     // Individual free-agent sign-ups: open to anyone, no login required,

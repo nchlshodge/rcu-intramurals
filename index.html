@@ -728,15 +728,34 @@
     </div>
 
     <div class="card" id="owner-coordinators-card" style="padding:20px 22px; margin-top:20px;" hidden>
-      <h3 style="margin-bottom:6px;">Coordinators</h3>
-      <p class="sub" style="margin-bottom:14px;">Owner only. Anyone signed in with one of these email addresses sees this Admin tab and can save changes here. Add or remove people by editing the list and saving — no invite email is sent, they just sign in with Google using that address.</p>
+      <h3 style="margin-bottom:6px;">Access &amp; invites</h3>
+      <p class="sub" style="margin-bottom:16px;">Commissioner only. Coordinators run day-to-day admin (season, devotional, game times, announcements). Commissioners can additionally manage who's on both lists below — no separate invite system, just add an email and sign in with Google using that address.</p>
+
       <form class="signup" id="owner-coordinators-form">
         <div class="field">
           <label for="owner-coordinators-list">Coordinator emails (one per line)</label>
           <textarea id="owner-coordinators-list" class="field-textarea" rows="5" placeholder="coach@rcu.edu&#10;coordinator@rochesterchristian.church"></textarea>
         </div>
-        <button type="submit" class="submit" id="owner-coordinators-save" style="width:auto;">Save coordinators</button>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button type="submit" class="submit" id="owner-coordinators-save" style="width:auto;">Save coordinators</button>
+          <button type="button" class="ghost-btn" id="owner-coordinators-invite">Draft invite email</button>
+        </div>
         <div class="status-msg" id="owner-coordinators-status" role="status"></div>
+      </form>
+
+      <div style="height:20px;"></div>
+
+      <form class="signup" id="owner-commissioners-form">
+        <div class="field">
+          <label for="owner-commissioners-list">Commissioner emails (one per line)</label>
+          <textarea id="owner-commissioners-list" class="field-textarea" rows="3" placeholder="commissioner@rcu.edu"></textarea>
+        </div>
+        <p class="form-note" style="margin-top:-6px;">The two founding emails hardcoded in firestore.rules always have commissioner access as a permanent fallback, even if this list is ever emptied.</p>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button type="submit" class="submit" id="owner-commissioners-save" style="width:auto;">Save commissioners</button>
+          <button type="button" class="ghost-btn" id="owner-commissioners-invite">Draft invite email</button>
+        </div>
+        <div class="status-msg" id="owner-commissioners-status" role="status"></div>
       </form>
     </div>
 
@@ -1062,6 +1081,8 @@
     if (sel) sel.value = state.activeSport;
     var coordListEl = document.getElementById('owner-coordinators-list');
     if (coordListEl) coordListEl.value = coordinatorEmails.join('\n');
+    var commListEl = document.getElementById('owner-commissioners-list');
+    if (commListEl) commListEl.value = commissionerEmails.join('\n');
     var ann = state.announcement || {};
     document.getElementById('admin-announcement-text').value = ann.text || '';
     document.getElementById('admin-announcement-link').value = ann.linkUrl || '';
@@ -1683,22 +1704,26 @@
     messagingSenderId: "538046866834"
   };
 
-  // Mirrors the hardcoded owner list in firestore.rules — an owner manages
-  // who's on the coordinators list; a coordinator manages everything else
-  // in the Admin tab. This client-side check only decides what to show;
-  // the rules are the actual enforcement either way.
-  var OWNER_EMAILS = ['nick@rochesterchristian.church', 'nchlshodge@gmail.com'];
+  // Mirrors the hardcoded bootstrap list in firestore.rules. It's a
+  // permanent fallback only — day-to-day commissioner/coordinator
+  // management happens through config/commissioners and config/coordinators
+  // in Firestore, editable from the Access & invites card below. This
+  // client-side check only decides what to show; the rules are the actual
+  // enforcement either way.
+  var BOOTSTRAP_COMMISSIONER_EMAILS = ['nick@rochesterchristian.church', 'nchlshodge@gmail.com'];
 
   var currentUser = null;
   var coordinatorEmails = [];
+  var commissionerEmails = [];
 
-  function isOwnerEmail(email){ return !!email && OWNER_EMAILS.indexOf(email) !== -1; }
-  function isCoordinatorEmail(email){ return !!email && (isOwnerEmail(email) || coordinatorEmails.indexOf(email) !== -1); }
+  function isBootstrapCommissioner(email){ return !!email && BOOTSTRAP_COMMISSIONER_EMAILS.indexOf(email) !== -1; }
+  function isCommissionerEmail(email){ return !!email && (isBootstrapCommissioner(email) || commissionerEmails.indexOf(email) !== -1); }
+  function isCoordinatorEmail(email){ return !!email && (isCommissionerEmail(email) || coordinatorEmails.indexOf(email) !== -1); }
 
   function updateAccessUI(){
     var signedIn = !!currentUser;
     var coordinator = signedIn && isCoordinatorEmail(currentUser.email);
-    var owner = signedIn && isOwnerEmail(currentUser.email);
+    var commissioner = signedIn && isCommissionerEmail(currentUser.email);
 
     document.getElementById('auth-signin-btn').hidden = signedIn;
     document.getElementById('auth-account').hidden = !signedIn;
@@ -1711,7 +1736,21 @@
     document.getElementById('admin-divider').hidden = !coordinator;
     if (!coordinator && document.getElementById('panel-admin').classList.contains('active')) showTab('home');
 
-    document.getElementById('owner-coordinators-card').hidden = !owner;
+    document.getElementById('owner-coordinators-card').hidden = !commissioner;
+  }
+
+  // Opens the viewer's own mail client pre-addressed and pre-written — this
+  // never sends anything itself, it just drafts, and the person reviews and
+  // hits send themselves.
+  function draftInviteEmail(emails, roleLabel){
+    if (!emails.length) return;
+    var siteUrl = window.location.origin + window.location.pathname;
+    var subject = 'You have been added as an RCU Intramurals ' + roleLabel;
+    var body = "Hi,\n\nYou've been added as a " + roleLabel + " for the RCU Intramurals app:\n" + siteUrl +
+      "\n\nSign in with Google using this email address (" + emails.join(', ') + ") and you'll see an Admin tab" +
+      " where you can manage things.\n";
+    window.location.href = 'mailto:' + emails.join(',') +
+      '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
   }
 
   (function initFirebase(){
@@ -1762,16 +1801,24 @@
       if (document.getElementById('panel-admin').classList.contains('active')) renderAdminMatchups();
     }, function(){ });
 
-    var unsubCoordinators = null;
+    var unsubCoordinators = null, unsubCommissioners = null;
     firebase.auth().onAuthStateChanged(function(user){
       currentUser = user;
       if (unsubCoordinators){ unsubCoordinators(); unsubCoordinators = null; }
-      if (!user){ coordinatorEmails = []; updateAccessUI(); return; }
+      if (unsubCommissioners){ unsubCommissioners(); unsubCommissioners = null; }
+      if (!user){ coordinatorEmails = []; commissionerEmails = []; updateAccessUI(); return; }
+
       unsubCoordinators = db.doc('config/coordinators').onSnapshot(function(snap){
         coordinatorEmails = (snap.exists && snap.data().emails) || [];
         updateAccessUI();
         if (document.getElementById('panel-admin').classList.contains('active')) populateAdminForms();
       }, function(){ coordinatorEmails = []; updateAccessUI(); });
+
+      unsubCommissioners = db.doc('config/commissioners').onSnapshot(function(snap){
+        commissionerEmails = (snap.exists && snap.data().emails) || [];
+        updateAccessUI();
+        if (document.getElementById('panel-admin').classList.contains('active')) populateAdminForms();
+      }, function(){ commissionerEmails = []; updateAccessUI(); });
     });
 
     document.getElementById('auth-signin-btn').addEventListener('click', function(){
@@ -1783,24 +1830,40 @@
       firebase.auth().signOut();
     });
 
-    document.getElementById('owner-coordinators-form').addEventListener('submit', function(ev){
-      ev.preventDefault();
-      var btn = document.getElementById('owner-coordinators-save');
-      var emails = document.getElementById('owner-coordinators-list').value
+    function parseEmailList(textareaId){
+      var emails = document.getElementById(textareaId).value
         .split('\n').map(function(l){ return l.trim().toLowerCase(); }).filter(Boolean);
-      emails = emails.filter(function(e, i){ return emails.indexOf(e) === i; });
-      btn.disabled = true;
-      showStatus('owner-coordinators-status', 'Saving…', true);
-      db.doc('config/coordinators').set({ emails: emails, updatedAt: Date.now() }).then(function(){
-        showStatus('owner-coordinators-status', emails.length + ' coordinator(s) saved.', true);
-        btn.disabled = false;
-      }).catch(function(err){
-        var msg = (err && err.code === 'permission-denied')
-          ? 'Only an owner account can change this.'
-          : 'Could not save right now — please try again.';
-        showStatus('owner-coordinators-status', msg, false);
-        btn.disabled = false;
+      return emails.filter(function(e, i){ return emails.indexOf(e) === i; });
+    }
+
+    function wireAccessForm(formId, textareaId, saveId, statusId, docPath, roleLabel, deniedMsg){
+      document.getElementById(formId).addEventListener('submit', function(ev){
+        ev.preventDefault();
+        var btn = document.getElementById(saveId);
+        var emails = parseEmailList(textareaId);
+        btn.disabled = true;
+        showStatus(statusId, 'Saving…', true);
+        db.doc(docPath).set({ emails: emails, updatedAt: Date.now() }).then(function(){
+          showStatus(statusId, emails.length + ' ' + roleLabel + '(s) saved.', true);
+          btn.disabled = false;
+        }).catch(function(err){
+          var msg = (err && err.code === 'permission-denied') ? deniedMsg : 'Could not save right now — please try again.';
+          showStatus(statusId, msg, false);
+          btn.disabled = false;
+        });
       });
+    }
+
+    wireAccessForm('owner-coordinators-form', 'owner-coordinators-list', 'owner-coordinators-save', 'owner-coordinators-status',
+      'config/coordinators', 'coordinator', 'Only a commissioner account can change this.');
+    wireAccessForm('owner-commissioners-form', 'owner-commissioners-list', 'owner-commissioners-save', 'owner-commissioners-status',
+      'config/commissioners', 'commissioner', 'Only a commissioner account can change this.');
+
+    document.getElementById('owner-coordinators-invite').addEventListener('click', function(){
+      draftInviteEmail(parseEmailList('owner-coordinators-list'), 'coordinator');
+    });
+    document.getElementById('owner-commissioners-invite').addEventListener('click', function(){
+      draftInviteEmail(parseEmailList('owner-commissioners-list'), 'commissioner');
     });
   })();
 
