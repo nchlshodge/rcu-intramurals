@@ -2,7 +2,8 @@
 
 A single-page intramural sports app for RCU Campus Recreation — sign-ups, team
 rosters, auto-generated schedule & standings, a coordinator admin panel, a
-daily Bible App reading, and the program's coordinator handbook.
+daily Bible App reading, a rules & policies reference, and the program's
+coordinator handbook.
 
 **Live site:** https://nchlshodge.github.io/rcu-intramurals/
 
@@ -136,5 +137,17 @@ saved real values — editing them isn't necessary, but it keeps a fresh copy
 of the file (or a from-scratch republish) starting from something sensible
 instead of stale demo data.
 
-The one thing still worth a look each season: the four sport cards on the
-**Sports** tab (season/month labels), if the sport rotation changes.
+## The Rules tab
+
+The **Rules** tab is a draft of RCU's actual IM Sports rules and policies —
+eligibility, sportsmanship rating system, forfeits/defaults, scheduling —
+with the RCU shield and RCC logo as a letterhead, and a visible "Draft — not
+yet final" notice. Right now it's static content in `index.html` (not yet
+admin-editable from the app, unlike everything above) — that's intentional
+for now, since the content itself is still being reviewed. Making it
+editable from the Admin tab is a natural next step once the rules are
+closer to final.
+
+A cost/budget analysis that came with the original draft was intentionally
+left out of the app (not something to publish to students) — it's kept in
+the source PDF, not duplicated into this repo.
