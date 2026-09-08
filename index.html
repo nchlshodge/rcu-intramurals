@@ -181,6 +181,34 @@
   .tabs-more-panel button{ width:100%; text-align:left; }
   .tabs-more-panel .tab-divider{ width:auto; height:1px; align-self:stretch; margin:4px 2px; }
 
+  .auth-modal-backdrop{
+    position:fixed; inset:0; z-index:60;
+    background: rgba(10,10,10,.55);
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .auth-modal-backdrop[hidden]{ display:none; }
+  .auth-modal{
+    width:100%; max-width:360px; padding:26px 24px 22px;
+    position:relative; display:flex; flex-direction:column; gap:14px;
+  }
+  .auth-modal-close{
+    position:absolute; top:10px; right:12px;
+    appearance:none; border:none; background:none; cursor:pointer;
+    font-size:1.5rem; line-height:1; color: var(--muted); padding:4px;
+  }
+  .auth-modal-close:hover{ color: var(--ink); }
+  .auth-modal-divider{
+    display:flex; align-items:center; gap:10px; color: var(--muted);
+    font-size:.76rem; font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:.06em;
+  }
+  .auth-modal-divider::before, .auth-modal-divider::after{ content:''; flex:1; height:1px; background: var(--line); }
+  .auth-modal-links{ display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
+  .linklike{
+    appearance:none; border:none; background:none; cursor:pointer; padding:0;
+    font-size:.82rem; color: var(--crimson); font-weight:700; text-decoration:underline;
+  }
+  .linklike:hover{ color: var(--crimson-deep); }
+
   .auth-widget{ grid-area: auth; display:flex; align-items:center; flex-shrink:0; margin-left:10px; }
   .auth-widget .ghost-btn{
     font-family:'JetBrains Mono',monospace; font-weight:700; font-size:.72rem; text-transform:uppercase;
@@ -514,7 +542,7 @@
       </div>
     </nav>
     <div class="auth-widget">
-      <button type="button" class="ghost-btn" id="auth-signin-btn">Sign in with Google</button>
+      <button type="button" class="ghost-btn" id="auth-signin-btn">Sign in</button>
       <div class="auth-account" id="auth-account" hidden>
         <img id="auth-avatar" alt="">
         <span id="auth-name"></span>
@@ -523,6 +551,25 @@
     </div>
   </div>
   <div class="tabs-more-backdrop" id="tabs-more-backdrop" hidden></div>
+</div>
+
+<div class="auth-modal-backdrop" id="auth-modal-backdrop" hidden>
+  <div class="auth-modal card" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+    <button type="button" class="auth-modal-close" id="auth-modal-close" aria-label="Close">&times;</button>
+    <h3 id="auth-modal-title" class="display" style="font-size:1.3rem; margin:0;">Sign in</h3>
+    <button type="button" class="ghost-btn" id="auth-google-btn" style="width:100%;">Continue with Google</button>
+    <div class="auth-modal-divider"><span>or</span></div>
+    <form id="auth-email-form" novalidate>
+      <div class="field"><label for="auth-email-input">Email</label><input id="auth-email-input" type="email" autocomplete="email" required maxlength="120"></div>
+      <div class="field"><label for="auth-password-input">Password</label><input id="auth-password-input" type="password" autocomplete="current-password" required minlength="6" maxlength="100"></div>
+      <button type="submit" class="submit" id="auth-email-submit">Sign in</button>
+    </form>
+    <div class="auth-modal-links">
+      <button type="button" class="linklike" id="auth-mode-toggle">Need an account? Create one</button>
+      <button type="button" class="linklike" id="auth-forgot-btn">Forgot password?</button>
+    </div>
+    <div class="status-msg" id="auth-modal-status"></div>
+  </div>
 </div>
 
 <div class="ticker">
@@ -2368,8 +2415,8 @@
     var siteUrl = window.location.origin + window.location.pathname;
     var subject = 'You have been added as an RCU Intramurals ' + roleLabel;
     var body = "Hi,\n\nYou've been added as a " + roleLabel + " for the RCU Intramurals app:\n" + siteUrl +
-      "\n\nSign in with Google using this email address (" + emails.join(', ') + ") and you'll see an Admin tab" +
-      " where you can manage things.\n";
+      "\n\nSign in using this email address (" + emails.join(', ') + ") — with Google, or by creating an" +
+      " account with a password — and you'll see an Admin tab where you can manage things.\n";
     window.location.href = 'mailto:' + emails.join(',') +
       '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
     // mailto: fails completely silently when the device has no default mail
@@ -2462,14 +2509,102 @@
       }, function(){ commissionerEmails = []; updateAccessUI(); });
     });
 
-    document.getElementById('auth-signin-btn').addEventListener('click', function(){
-      firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).catch(function(err){
-        console.error('Sign-in failed', err);
-      });
-    });
     document.getElementById('auth-signout-btn').addEventListener('click', function(){
       firebase.auth().signOut();
     });
+
+    // ---------- Sign-in modal: Google or email/password ----------
+    (function initAuthModal(){
+      var backdrop = document.getElementById('auth-modal-backdrop');
+      var closeBtn = document.getElementById('auth-modal-close');
+      var googleBtn = document.getElementById('auth-google-btn');
+      var form = document.getElementById('auth-email-form');
+      var emailInput = document.getElementById('auth-email-input');
+      var passwordInput = document.getElementById('auth-password-input');
+      var submitBtn = document.getElementById('auth-email-submit');
+      var modeToggle = document.getElementById('auth-mode-toggle');
+      var forgotBtn = document.getElementById('auth-forgot-btn');
+      var title = document.getElementById('auth-modal-title');
+      var mode = 'signin';
+
+      function friendlyAuthError(err){
+        switch (err && err.code){
+          case 'auth/invalid-email': return "That doesn't look like a valid email address.";
+          case 'auth/user-not-found': return 'No account found for that email — need to create one?';
+          case 'auth/wrong-password': return 'Wrong password — try again, or reset it below.';
+          case 'auth/email-already-in-use': return 'An account already exists for that email — try signing in instead.';
+          case 'auth/weak-password': return 'Password needs to be at least 6 characters.';
+          case 'auth/too-many-requests': return 'Too many attempts — wait a bit and try again.';
+          case 'auth/popup-blocked': case 'auth/popup-closed-by-user': return 'Sign-in window was closed before finishing.';
+          default: return 'Something went wrong — please try again.';
+        }
+      }
+
+      function setMode(next){
+        mode = next;
+        var signIn = mode === 'signin';
+        title.textContent = signIn ? 'Sign in' : 'Create account';
+        submitBtn.textContent = signIn ? 'Sign in' : 'Create account';
+        modeToggle.textContent = signIn ? 'Need an account? Create one' : 'Already have an account? Sign in';
+        forgotBtn.hidden = !signIn;
+        passwordInput.setAttribute('autocomplete', signIn ? 'current-password' : 'new-password');
+        document.getElementById('auth-modal-status').className = 'status-msg';
+      }
+
+      function openModal(){
+        backdrop.hidden = false;
+        setMode('signin');
+        form.reset();
+        document.getElementById('auth-modal-status').className = 'status-msg';
+        emailInput.focus();
+      }
+      function closeModal(){ backdrop.hidden = true; }
+
+      document.getElementById('auth-signin-btn').addEventListener('click', openModal);
+      closeBtn.addEventListener('click', closeModal);
+      backdrop.addEventListener('click', function(ev){ if (ev.target === backdrop) closeModal(); });
+      document.addEventListener('keydown', function(ev){
+        if (ev.key === 'Escape' && !backdrop.hidden) closeModal();
+      });
+
+      googleBtn.addEventListener('click', function(){
+        firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()).then(function(){
+          closeModal();
+        }).catch(function(err){
+          console.error('Sign-in failed', err);
+          showStatus('auth-modal-status', friendlyAuthError(err), false);
+        });
+      });
+
+      modeToggle.addEventListener('click', function(){ setMode(mode === 'signin' ? 'signup' : 'signin'); });
+
+      forgotBtn.addEventListener('click', function(){
+        var email = emailInput.value.trim();
+        if (!email){ showStatus('auth-modal-status', 'Enter your email above first, then tap this again.', false); return; }
+        firebase.auth().sendPasswordResetEmail(email).then(function(){
+          showStatus('auth-modal-status', 'Password reset email sent — check your inbox.', true);
+        }).catch(function(err){
+          showStatus('auth-modal-status', friendlyAuthError(err), false);
+        });
+      });
+
+      form.addEventListener('submit', function(ev){
+        ev.preventDefault();
+        var email = emailInput.value.trim();
+        var password = passwordInput.value;
+        submitBtn.disabled = true;
+        var action = mode === 'signin'
+          ? firebase.auth().signInWithEmailAndPassword(email, password)
+          : firebase.auth().createUserWithEmailAndPassword(email, password);
+        action.then(function(){
+          submitBtn.disabled = false;
+          closeModal();
+        }).catch(function(err){
+          submitBtn.disabled = false;
+          showStatus('auth-modal-status', friendlyAuthError(err), false);
+        });
+      });
+    })();
 
     function parseEmailList(textareaId){
       var emails = document.getElementById(textareaId).value

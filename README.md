@@ -12,7 +12,8 @@ styling/markup/logic all inline, RCU shield / RCC logo / RCU Alumni
 Association mark embedded as base64 images. It's hosted as a static site on
 **GitHub Pages** and backed by a real **Firebase** project (`rcu-intramurals`)
 for shared data — Cloud Firestore for the database, Firebase Authentication
-(Google Sign-In) for telling coordinators apart from everyone else.
+(Google Sign-In, or plain email + password) for telling coordinators apart
+from everyone else.
 
 ## Files
 
@@ -67,10 +68,12 @@ the project — currently `nchlshodge@gmail.com`.)
 
 ### Granting coordinator / commissioner access
 
-There's no separate account system — access is entirely about which Google
-email is signed in, checked three ways:
+There's no separate account system — access is entirely about which email
+is signed in (via Google, or an email + password account — both work
+identically since access is keyed on the email address itself, not how
+someone proved it), checked three ways:
 
-- **Coordinators** — anyone signed in with Google using an email on the
+- **Coordinators** — anyone signed in with an email on the
   **Coordinators** list (Admin tab → Access & invites, commissioner-only)
   sees the **Admin** tab and can save season dates, the devotional plan,
   the announcement, active sport, and game times.
