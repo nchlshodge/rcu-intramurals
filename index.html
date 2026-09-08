@@ -128,15 +128,21 @@
   }
   .appbar-inner{
     max-width:1180px; margin:0 auto; padding: 12px 20px;
-    display:flex; align-items:center; gap:16px;
+    display:grid; grid-template-columns: auto 1fr auto; grid-template-areas: "brand . auth" "tabs tabs tabs";
+    gap:10px 16px; align-items:center;
   }
-  .brand{ display:flex; align-items:center; gap:11px; flex-shrink:0; }
+  .brand{ grid-area: brand; display:flex; align-items:center; gap:11px; flex-shrink:0; }
   .brand img{ width:34px; height:34px; display:block; }
   .brand .word{ display:flex; flex-direction:column; line-height:1; }
   .brand .word .t1{ font-family:'Anton', sans-serif; font-size:1.18rem; color:#fff; letter-spacing:.02em; }
   .brand .word .t2{ font-family:'JetBrains Mono', monospace; font-size:.62rem; letter-spacing:.16em; color: var(--gold); margin-top:3px; }
 
-  .tabs{ display:flex; gap:2px; margin-left:auto; overflow-x:auto; }
+  .tabs{
+    grid-area: tabs;
+    position:relative;
+    display:flex; flex-wrap:nowrap; gap:2px;
+    padding-top:9px; border-top:1px solid rgba(255,255,255,.08);
+  }
   .tabs button{
     appearance:none; border:none; cursor:pointer;
     background: transparent; color: #c7c8ce;
@@ -151,7 +157,31 @@
   .tabs button.tab-admin:hover{ color:#fff; }
   .tabs button.tab-admin[aria-selected="true"]{ background: var(--gold); color:#241a04; }
 
-  .auth-widget{ display:flex; align-items:center; flex-shrink:0; margin-left:10px; }
+  .tabs-more-btn{
+    appearance:none; border:none; cursor:pointer;
+    background: rgba(255,255,255,.06); color:#c7c8ce;
+    font-family:'JetBrains Mono', monospace; font-size:.76rem; font-weight:600; letter-spacing:.04em; text-transform:uppercase;
+    padding: 9px 14px; border-radius:7px; white-space:nowrap;
+    display:inline-flex; align-items:center; gap:3px;
+    transition: background .12s, color .12s;
+  }
+  .tabs-more-btn:hover{ background: rgba(255,255,255,.12); color:#fff; }
+  .tabs-more-btn.has-active{ background: var(--crimson); color:#fff; }
+
+  .tabs-more-backdrop{ position:fixed; inset:0; background: rgba(0,0,0,.45); z-index:1; }
+  .tabs-more-backdrop[hidden]{ display:none; }
+
+  .tabs-more-panel{
+    position:absolute; top:calc(100% + 8px); right:0; z-index:2;
+    background: var(--charcoal); border:1px solid rgba(255,255,255,.14);
+    border-radius:12px; padding:6px; display:flex; flex-direction:column; gap:2px;
+    min-width:180px; box-shadow: 0 16px 40px rgba(0,0,0,.45);
+  }
+  .tabs-more-panel[hidden]{ display:none; }
+  .tabs-more-panel button{ width:100%; text-align:left; }
+  .tabs-more-panel .tab-divider{ width:auto; height:1px; align-self:stretch; margin:4px 2px; }
+
+  .auth-widget{ grid-area: auth; display:flex; align-items:center; flex-shrink:0; margin-left:10px; }
   .auth-widget .ghost-btn{
     font-family:'JetBrains Mono',monospace; font-weight:700; font-size:.72rem; text-transform:uppercase;
     background: rgba(255,255,255,.08); color:#e8e9ee; border:1px solid rgba(255,255,255,.16);
@@ -474,11 +504,14 @@
       <button role="tab" data-tab="sports" aria-selected="false">Sports</button>
       <button role="tab" data-tab="signup" aria-selected="false">Sign Up</button>
       <button role="tab" data-tab="schedule" aria-selected="false">Schedule</button>
-      <button role="tab" data-tab="rules" aria-selected="false">Rules</button>
-      <button role="tab" data-tab="handbook" aria-selected="false">Handbook</button>
-      <button role="tab" data-tab="devotional" aria-selected="false">Devotional</button>
-      <span class="tab-divider" id="admin-divider" aria-hidden="true" hidden></span>
-      <button role="tab" data-tab="admin" aria-selected="false" class="tab-admin" id="admin-tab-btn" hidden>Admin</button>
+      <button type="button" class="tabs-more-btn" id="tabs-more-btn" aria-haspopup="true" aria-expanded="false">More <span aria-hidden="true">&#9662;</span></button>
+      <div class="tabs-more-panel" id="tabs-more-panel" role="menu" hidden>
+        <button role="tab" data-tab="rules" aria-selected="false">Rules</button>
+        <button role="tab" data-tab="handbook" aria-selected="false">Handbook</button>
+        <button role="tab" data-tab="devotional" aria-selected="false">Devotional</button>
+        <span class="tab-divider" id="admin-divider" aria-hidden="true" hidden></span>
+        <button role="tab" data-tab="admin" aria-selected="false" class="tab-admin" id="admin-tab-btn" hidden>Admin</button>
+      </div>
     </nav>
     <div class="auth-widget">
       <button type="button" class="ghost-btn" id="auth-signin-btn">Sign in with Google</button>
@@ -489,6 +522,7 @@
       </div>
     </div>
   </div>
+  <div class="tabs-more-backdrop" id="tabs-more-backdrop" hidden></div>
 </div>
 
 <div class="ticker">
@@ -1749,12 +1783,39 @@
     Array.from(document.querySelectorAll('.panel')).forEach(function(p){
       p.classList.toggle('active', p.id === 'panel-' + name);
     });
+    document.getElementById('tabs-more-btn').classList.toggle('has-active', ['rules','handbook','devotional','admin'].indexOf(name) !== -1);
     if (name === 'admin'){ populateAdminForms(); renderAdminMatchups(); }
   };
   document.querySelector('.tabs').addEventListener('click', function(ev){
     var b = ev.target.closest('button[data-tab]');
     if (b) showTab(b.getAttribute('data-tab'));
   });
+
+  // ---------- Tabs: "More" overflow menu ----------
+  (function initTabsMore(){
+    var moreBtn = document.getElementById('tabs-more-btn');
+    var panel = document.getElementById('tabs-more-panel');
+    var backdrop = document.getElementById('tabs-more-backdrop');
+
+    function openPanel(){
+      panel.hidden = false; backdrop.hidden = false;
+      moreBtn.setAttribute('aria-expanded', 'true');
+    }
+    function closePanel(){
+      panel.hidden = true; backdrop.hidden = true;
+      moreBtn.setAttribute('aria-expanded', 'false');
+    }
+    moreBtn.addEventListener('click', function(){
+      if (panel.hidden) openPanel(); else closePanel();
+    });
+    backdrop.addEventListener('click', closePanel);
+    panel.addEventListener('click', function(ev){
+      if (ev.target.closest('button[data-tab]')) closePanel();
+    });
+    document.addEventListener('keydown', function(ev){
+      if (ev.key === 'Escape' && !panel.hidden) closePanel();
+    });
+  })();
 
   // ---------- Admin: announcement ----------
   function saveAnnouncement(a, statusId, successMsg){
